@@ -5,6 +5,7 @@ import (
 	"errors"
 	"golang.org/x/crypto/ssh/terminal"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -44,7 +45,7 @@ func New(AppName string, forceJSON bool, hostName string) *Logger {
 	}
 }
 
-func (l Logger) writePretty(level string, args []interface{}) {
+func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 
 	date := time.Now().String()
 	buf, err := json.Marshal([2]string{l.AppName, date})
@@ -57,10 +58,10 @@ func (l Logger) writePretty(level string, args []interface{}) {
 	os.Stdout.Write([]byte("\n"))
 }
 
-func (l Logger) writeJSON(level string, args []interface{}) {
+func (l Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 
 	date := time.Now().String()
-	buf, err := json.Marshal([4]interface{}{l.AppName, level, date, args})
+	buf, err := json.Marshal([5]interface{}{l.AppName, level, date, m, args})
 
 	if err != nil {
 		panic(errors.New("could not marshal the string array"))
@@ -70,16 +71,70 @@ func (l Logger) writeJSON(level string, args []interface{}) {
 	os.Stdout.Write([]byte("\n"))
 }
 
-func (l Logger) Info(args ...interface{}) {
+func (l Logger) writeSwitch(level string, m *MetaFields, args *[]interface{}) {
 	if l.IsLoggingJSON {
-		l.writeJSON("INFO", args)
+		l.writeJSON(level, m, args)
 	} else {
-		l.writePretty("INFO", args)
+		l.writePretty(level, m, args)
 	}
 }
 
-func (l Logger) Warn(args ...interface{}) {
+func (l Logger) Info(args ...interface{}) {
+	l.writeSwitch("INFO", nil, &args)
+}
 
+func (l Logger) Warn(args ...interface{}) {
+	l.writeSwitch("WARN", nil, &args)
+}
+
+func (l Logger) Error(args ...interface{}) {
+	l.writeSwitch("ERROR", nil, &args)
+}
+
+func (l Logger) Fatal(args ...interface{}) {
+	l.writeSwitch("FATAL", nil, &args)
+}
+
+func (l Logger) Debug(args ...interface{}) {
+	l.writeSwitch("DEBUG", nil, &args)
+}
+
+func (l Logger) Trace(args ...interface{}) {
+	l.writeSwitch("TRACE", nil, &args)
+}
+
+type MetaFields struct {
+	Meta map[string]interface{}
+}
+
+func Meta(m map[string]interface{}) MetaFields {
+	return MetaFields{
+		Meta: m,
+	}
+}
+
+func (l Logger) InfoWithMeta(m MetaFields, args ...interface{}) {
+	l.writeSwitch("INFO", &m, &args)
+}
+
+func (l Logger) WarnWithMeta(m MetaFields, args ...interface{}) {
+	l.writeSwitch("WARN", &m, &args)
+}
+
+func (l Logger) ErrorWithMeta(m MetaFields, args ...interface{}) {
+	l.writeSwitch("ERROR", &m, &args)
+}
+
+func (l Logger) FatalWithMeta(m MetaFields, args ...interface{}) {
+	l.writeSwitch("FATAL", &m, &args)
+}
+
+func (l Logger) DebugWithMeta(m MetaFields, args ...interface{}) {
+	l.writeSwitch("DEBUG", &m, &args)
+}
+
+func (l Logger) TraceWithMeta(m MetaFields, args ...interface{}) {
+	l.writeSwitch("TRACE", &m, &args)
 }
 
 func (l Logger) NewLine() {
@@ -87,11 +142,11 @@ func (l Logger) NewLine() {
 }
 
 func (l Logger) Spaces(num int32) {
-
+	os.Stdout.Write([]byte(strings.Join(make([]string, num), " ")))
 }
 
 func (l Logger) Tabs(num int32) {
-
+	os.Stdout.Write([]byte(strings.Join(make([]string, num), "\t")))
 }
 
 var DefaultLogger = Logger{
