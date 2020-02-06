@@ -92,7 +92,7 @@ func (l Logger) Tabs(num int32) {
 
 }
 
-var DefaultLogger = New("AppName")
+var DefaultLogger = New("AppName", "")
 
 func init() {
 
