@@ -2,4 +2,4 @@ package main
 
 import jlog "json-logging"
 
-var Log = jlog.New("Sam", false, "host")
+var fog = jlog.New("Sam", false, "host")
