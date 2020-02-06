@@ -18,8 +18,8 @@ type Logger struct {
 	AppName       string
 	IsLoggingJSON bool
 	HostName      string
-	ForceJSON bool
-	ForceNonJSON bool
+	ForceJSON     bool
+	ForceNonJSON  bool
 }
 
 func New(AppName string, forceJSON bool, hostName string) *Logger {
@@ -71,7 +71,7 @@ func (l Logger) writeJSON(level string, args []interface{}) {
 }
 
 func (l Logger) Info(args ...interface{}) {
-	if l.IsLoggingJSON || true {
+	if l.IsLoggingJSON {
 		l.writeJSON("INFO", args)
 	} else {
 		l.writePretty("INFO", args)
@@ -97,7 +97,7 @@ func (l Logger) Tabs(num int32) {
 var DefaultLogger = Logger{
 	AppName:       "Default",
 	IsLoggingJSON: !isTerminal,
-	HostName:     "",
+	HostName:      "",
 }
 
 func init() {
