@@ -27,8 +27,11 @@ func main() {
 	})
 
 
-	Log.Tabs(5)
+	Log.Spaces(5)
+	Log.Info("foo")
+	Log.Spaces(5)
 	Log.NewLine()
 	Log.Spaces(8)
+	Log.NewLine()
 
 }
