@@ -1,4 +1,4 @@
-module json-logging
+module github.com/oresoftware/json-logging
 
 go 1.13
 
