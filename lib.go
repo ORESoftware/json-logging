@@ -17,16 +17,32 @@ type jsons struct {
 type Logger struct {
 	AppName       string
 	IsLoggingJSON bool
+	HostName      string
 }
 
-func New(AppName string) Logger {
-	return Logger{
+func New(AppName string, hostName string) *Logger {
+
+	if hostName == "" {
+
+		hn, err := os.Hostname()
+
+		if err != nil {
+			DefaultLogger.Warn("Could not grab hostname from env.")
+			hostName = "unknown_hostname"
+		} else {
+			hostName = hn
+		}
+
+	}
+
+	return &Logger{
 		IsLoggingJSON: !isTerminal,
 		AppName:       AppName,
+		HostName:      hostName,
 	}
 }
 
-func (l Logger) writePretty(args []interface{}) {
+func (l Logger) writePretty(level string, args []interface{}) {
 
 	date := time.Now().String()
 	buf, err := json.Marshal([2]string{l.AppName, date})
@@ -39,7 +55,7 @@ func (l Logger) writePretty(args []interface{}) {
 	os.Stdout.Write([]byte("\n"))
 }
 
-func (l Logger) writeJSON(args []interface{}) {
+func (l Logger) writeJSON(level string, args []interface{}) {
 
 	date := time.Now().String()
 	buf, err := json.Marshal([2]string{l.AppName, date})
@@ -54,13 +70,25 @@ func (l Logger) writeJSON(args []interface{}) {
 
 func (l Logger) Info(args ...interface{}) {
 	if l.IsLoggingJSON {
-		l.writeJSON(args)
+		l.writeJSON("INFO", args)
 	} else {
-		l.writePretty(args)
+		l.writePretty("INFO", args)
 	}
 }
 
-func (l Logger) Warn() {
+func (l Logger) Warn(args ...interface{}) {
+
+}
+
+func (l Logger) NewLine() {
+	os.Stdout.Write([]byte("\n"))
+}
+
+func (l Logger) Spaces(num int32) {
+
+}
+
+func (l Logger) Tabs(num int32) {
 
 }
 
