@@ -18,9 +18,11 @@ type Logger struct {
 	AppName       string
 	IsLoggingJSON bool
 	HostName      string
+	ForceJSON bool
+	ForceNonJSON bool
 }
 
-func New(AppName string, hostName string) *Logger {
+func New(AppName string, forceJSON bool, hostName string) *Logger {
 
 	if hostName == "" {
 
@@ -36,7 +38,7 @@ func New(AppName string, hostName string) *Logger {
 	}
 
 	return &Logger{
-		IsLoggingJSON: !isTerminal,
+		IsLoggingJSON: !isTerminal && !forceJSON,
 		AppName:       AppName,
 		HostName:      hostName,
 	}
@@ -58,7 +60,7 @@ func (l Logger) writePretty(level string, args []interface{}) {
 func (l Logger) writeJSON(level string, args []interface{}) {
 
 	date := time.Now().String()
-	buf, err := json.Marshal([2]string{l.AppName, date})
+	buf, err := json.Marshal([4]interface{}{l.AppName, level, date, args})
 
 	if err != nil {
 		panic(errors.New("could not marshal the string array"))
@@ -69,7 +71,7 @@ func (l Logger) writeJSON(level string, args []interface{}) {
 }
 
 func (l Logger) Info(args ...interface{}) {
-	if l.IsLoggingJSON {
+	if l.IsLoggingJSON || true {
 		l.writeJSON("INFO", args)
 	} else {
 		l.writePretty("INFO", args)
@@ -92,7 +94,11 @@ func (l Logger) Tabs(num int32) {
 
 }
 
-var DefaultLogger = New("AppName", "")
+var DefaultLogger = Logger{
+	AppName:       "Default",
+	IsLoggingJSON: !isTerminal,
+	HostName:     "",
+}
 
 func init() {
 

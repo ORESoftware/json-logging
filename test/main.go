@@ -4,8 +4,16 @@ import (
 	log "json-logging"
 )
 
-func main(){
+func main() {
 
-  log.DefaultLogger.Info("foo")
+	type Buff struct{ Bagel bool }
+
+	log.DefaultLogger.Info("foo", struct {
+		Foo  string
+		Butt Buff
+	}{"bar", Buff{
+		Bagel: true,
+	},
+	})
 
 }
