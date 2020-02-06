@@ -11,21 +11,19 @@ func main() {
 
 	Log.Info("foo", struct {
 		Foo  string `json:"foo"`
-		Butt Buff `json:"buff"`
+		Butt Buff   `json:"buff"`
 	}{"bar", Buff{
 		Bagel: true,
 	},
 	})
 
-
-	Log.InfoWithMeta(jlog.Meta(map[string]interface{}{"foo":5}) , "bar",struct {
+	Log.InfoWithMeta(jlog.Meta(map[string]interface{}{"foo": 5}), "bar", struct {
 		Foo  string `json:"foo"`
-		Butt Buff `json:"buff"`
+		Butt Buff   `json:"buff"`
 	}{"bar", Buff{
 		Bagel: true,
 	},
 	})
-
 
 	Log.Spaces(5)
 	Log.Info("foo")
