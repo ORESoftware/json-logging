@@ -26,4 +26,9 @@ func main() {
 	},
 	})
 
+
+	Log.Tabs(5)
+	Log.NewLine()
+	Log.Spaces(8)
+
 }
