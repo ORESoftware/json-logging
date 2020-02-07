@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/logrusorgru/aurora"
 	"golang.org/x/crypto/ssh/terminal"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -24,7 +26,7 @@ type Logger struct {
 	HostName      string
 	ForceJSON     bool
 	ForceNonJSON  bool
-	TimeZone string
+	TimeZone      string
 }
 
 type loggingTypeInternal struct {
@@ -46,7 +48,7 @@ type LoggerParams struct {
 	ForceJSON     bool
 	ForceNonJSON  bool
 	MetaFields    MetaFields
-	TimeZone string
+	TimeZone      string
 }
 
 func New(AppName string, forceJSON bool, hostName string) *Logger {
@@ -103,14 +105,60 @@ func (l Logger) Create(m *MetaFields) *Logger {
 
 func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 
-	date := time.Now().UTC().String()
-	buf, err := json.Marshal([2]string{l.AppName, date})
+	date := time.Now().UTC().String()[11:25] // only first 25 chars
 
-	if err != nil {
-		panic(errors.New("could not marshal the string array"))
+	stylizedLevel := level
+
+	switch level {
+	case "ERROR":
+		stylizedLevel = aurora.Red(level).String()
+		break
+
+	case "WARN":
+		stylizedLevel = aurora.Magenta(level).String()
+		break
+
+	case "DEBUG":
+		stylizedLevel = aurora.BgBrightYellow(level).String()
+		break
+
+	case "INFO":
+		stylizedLevel = aurora.BrightBlue(level).String()
+		break
 	}
 
-	os.Stdout.Write(buf)
+	buf := []string{
+		aurora.Gray(9, date).String(), " ",
+		stylizedLevel, " ",
+		"app:" + aurora.Cyan(l.AppName).String(), " ",
+	}
+
+	for _, v := range buf {
+		os.Stdout.Write([]byte(v))
+	}
+
+	for _, v := range *args {
+
+		if reflect.TypeOf(v).Name() == "string" {
+			os.Stdout.Write([]byte(v.(string) + " "))
+			continue
+		}
+
+		if reflect.TypeOf(v).Name() == "bool" {
+			os.Stdout.Write([]byte(strconv.FormatBool(v.(bool)) + " "))
+			continue
+		}
+
+		json, err := json.Marshal(v)
+		if err != nil {
+			z := fmt.Sprintf("%v", v)
+			os.Stdout.Write([]byte(z + " "))
+			continue
+		}
+
+		os.Stdout.Write(json)
+	}
+
 	os.Stdout.Write([]byte("\n"))
 }
 
@@ -118,7 +166,7 @@ func (l Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 
 	date := time.Now().UTC().String()
 	date = date[:26]
-	buf, err := json.Marshal([8]interface{}{"@bunion",l.AppName, level, pid, l.HostName, date, m, args})
+	buf, err := json.Marshal([8]interface{}{"@bunion", l.AppName, level, pid, l.HostName, date, m, args})
 
 	if err != nil {
 		panic(errors.New("could not marshal the string array"))
@@ -160,18 +208,7 @@ func (l Logger) Trace(args ...interface{}) {
 	l.writeSwitch("TRACE", nil, &args)
 }
 
-//type MetaFields struct {
-//	Meta map[string]interface{}
-//}
-
 type MetaFields = map[string]interface{}
-
-
-//func Meta(m map[string]interface{}) MetaFields {
-//	return MetaFields{
-//		Meta: m,
-//	}
-//}
 
 func MetaPairs(
 	k1 string, v1 interface{},
