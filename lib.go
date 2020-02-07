@@ -117,15 +117,6 @@ func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 
 func (l Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 
-	//'@bunion',
-	//	appName,
-	//	level,
-	//	process.pid,
-	//	host,
-	//	new Date().toUTCString(),
-	//	fields,
-	//	clean
-
 	date := time.Now().UTC().String()
 	date = date[:26]
 	buf, err := json.Marshal([8]interface{}{"@bunion",l.AppName, level, pid, l.HostName, date, m, args})
