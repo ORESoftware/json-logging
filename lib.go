@@ -24,6 +24,8 @@ type Logger struct {
 	HostName      string
 	ForceJSON     bool
 	ForceNonJSON  bool
+	TimeZone string
+
 }
 
 type loggingTypeInternal struct {
@@ -45,6 +47,7 @@ type LoggerParams struct {
 	ForceJSON     bool
 	ForceNonJSON  bool
 	MetaFields    MetaFields
+	TimeZone string
 }
 
 func New(AppName string, forceJSON bool, hostName string) *Logger {
@@ -124,6 +127,7 @@ func (l Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 	//	clean
 
 	date := time.Now().UTC().String()
+	date = date[:26]
 	buf, err := json.Marshal([8]interface{}{"@bunion",l.AppName, level, pid, l.HostName, date, m, args})
 
 	if err != nil {
