@@ -25,7 +25,6 @@ type Logger struct {
 	ForceJSON     bool
 	ForceNonJSON  bool
 	TimeZone string
-
 }
 
 type loggingTypeInternal struct {
