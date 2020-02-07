@@ -17,7 +17,7 @@ func main() {
 	},
 	})
 
-	Log.InfoWithMeta(jlog.Meta(map[string]interface{}{"foo": 5}), "bar", struct {
+	Log.Infox(map[string]interface{}{"foo": 5}, "bar", struct {
 		Foo  string `json:"foo"`
 		Butt Buff   `json:"buff"`
 	}{"bar", Buff{
@@ -25,9 +25,9 @@ func main() {
 	},
 	})
 
-	m := jlog.MetaPairs("foo", 5, true, struct{Dog int32}{55})
+	m := jlog.MetaPairs("foo", 5, "zgage", "vv")
 
-	Log.InfoWithMeta(m, "bar", struct {
+	Log.Infox(m, "bar", struct {
 		Foo  string `json:"foo"`
 		Butt Buff   `json:"buff"`
 	}{"bar", Buff{

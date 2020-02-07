@@ -12,6 +12,7 @@ import (
 )
 
 var isTerminal = terminal.IsTerminal(int(os.Stdout.Fd()))
+var pid = os.Getpid()
 
 type jsons struct {
 	Time int32
@@ -26,7 +27,7 @@ type Logger struct {
 }
 
 type loggingTypeInternal struct {
-	JSON string
+	JSON   string
 	Pretty string
 }
 
@@ -43,7 +44,7 @@ type LoggerParams struct {
 	HostName      string
 	ForceJSON     bool
 	ForceNonJSON  bool
-	MetaFields  MetaFields
+	MetaFields    MetaFields
 }
 
 func New(AppName string, forceJSON bool, hostName string) *Logger {
@@ -90,7 +91,7 @@ func NewLogger(AppName string, forceJSON bool, hostName string) *Logger {
 	}
 }
 
-func (l Logger) Create(m *MetaFields)  *Logger {
+func (l Logger) Create(m *MetaFields) *Logger {
 	return &Logger{
 		IsLoggingJSON: l.IsLoggingJSON,
 		AppName:       l.AppName,
@@ -100,7 +101,7 @@ func (l Logger) Create(m *MetaFields)  *Logger {
 
 func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 
-	date := time.Now().String()
+	date := time.Now().UTC().String()
 	buf, err := json.Marshal([2]string{l.AppName, date})
 
 	if err != nil {
@@ -113,8 +114,17 @@ func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 
 func (l Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 
-	date := time.Now().String()
-	buf, err := json.Marshal([5]interface{}{l.AppName, level, date, m, args})
+	//'@bunion',
+	//	appName,
+	//	level,
+	//	process.pid,
+	//	host,
+	//	new Date().toUTCString(),
+	//	fields,
+	//	clean
+
+	date := time.Now().UTC().String()
+	buf, err := json.Marshal([8]interface{}{"@bunion",l.AppName, level, pid, l.HostName, date, m, args})
 
 	if err != nil {
 		panic(errors.New("could not marshal the string array"))
@@ -156,71 +166,76 @@ func (l Logger) Trace(args ...interface{}) {
 	l.writeSwitch("TRACE", nil, &args)
 }
 
-type MetaFields struct {
-	Meta map[string]interface{}
-}
+//type MetaFields struct {
+//	Meta map[string]interface{}
+//}
 
-func Meta(m map[string]interface{}) MetaFields {
-	return MetaFields{
-		Meta: m,
-	}
-}
+type MetaFields = map[string]interface{}
+
+
+//func Meta(m map[string]interface{}) MetaFields {
+//	return MetaFields{
+//		Meta: m,
+//	}
+//}
 
 func MetaPairs(
 	k1 string, v1 interface{},
 	args ...interface{}) MetaFields {
 
-	m := make(map[string]interface{});
-	nargs := append([]interface{}{k1, v1}, args...)
+	m := make(map[string]interface{})
+	nargs := append([]interface{}{k1, v1}, args...) // prepend the first two arguments to new slice
 
 	currKey := ""
 
 	for i, a := range nargs {
 
-		if i % 2 == 0 {
+		if i%2 == 0 {
 			// operate on keys
 			v, ok := a.(string)
 			if ok {
 				currKey = v
-			} else{
+			} else {
 				panic("even arguments must be strings, odd arguments are interface{}")
 			}
-			if nargs[i + 1] == nil {
-                 panic("a key needs a respective value.")
+			if len(nargs) < i+2 {
+				panic("a key needs a respective value.")
 			}
-		  continue
+			continue
 		}
 
 		// operate on values
 		m[currKey] = a
 	}
 
-	return MetaFields{
-		Meta: m,
-	}
+	return m
+
+	//return MetaFields{
+	//	Meta: m,
+	//}
 }
 
-func (l Logger) InfoWithMeta(m MetaFields, args ...interface{}) {
+func (l Logger) Infox(m MetaFields, args ...interface{}) {
 	l.writeSwitch("INFO", &m, &args)
 }
 
-func (l Logger) WarnWithMeta(m MetaFields, args ...interface{}) {
+func (l Logger) Warnx(m MetaFields, args ...interface{}) {
 	l.writeSwitch("WARN", &m, &args)
 }
 
-func (l Logger) ErrorWithMeta(m MetaFields, args ...interface{}) {
+func (l Logger) Errorx(m MetaFields, args ...interface{}) {
 	l.writeSwitch("ERROR", &m, &args)
 }
 
-func (l Logger) FatalWithMeta(m MetaFields, args ...interface{}) {
+func (l Logger) Fatalx(m MetaFields, args ...interface{}) {
 	l.writeSwitch("FATAL", &m, &args)
 }
 
-func (l Logger) DebugWithMeta(m MetaFields, args ...interface{}) {
+func (l Logger) Debugx(m MetaFields, args ...interface{}) {
 	l.writeSwitch("DEBUG", &m, &args)
 }
 
-func (l Logger) TraceWithMeta(m MetaFields, args ...interface{}) {
+func (l Logger) Tracex(m MetaFields, args ...interface{}) {
 	l.writeSwitch("TRACE", &m, &args)
 }
 
