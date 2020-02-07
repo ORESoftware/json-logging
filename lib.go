@@ -43,6 +43,7 @@ type LoggerParams struct {
 	HostName      string
 	ForceJSON     bool
 	ForceNonJSON  bool
+	MetaFields  MetaFields
 }
 
 func New(AppName string, forceJSON bool, hostName string) *Logger {
@@ -160,6 +161,40 @@ type MetaFields struct {
 }
 
 func Meta(m map[string]interface{}) MetaFields {
+	return MetaFields{
+		Meta: m,
+	}
+}
+
+func MetaPairs(
+	k1 string, v1 interface{},
+	args ...interface{}) MetaFields {
+
+	m := make(map[string]interface{});
+	nargs := append([]interface{}{k1, v1}, args...)
+
+	currKey := ""
+
+	for i, a := range nargs {
+
+		if i % 2 == 0 {
+			// operate on keys
+			v, ok := a.(string)
+			if ok {
+				currKey = v
+			} else{
+				panic("even arguments must be strings, odd arguments are interface{}")
+			}
+			if nargs[i + 1] == nil {
+                 panic("a key needs a respective value.")
+			}
+		  continue
+		}
+
+		// operate on values
+		m[currKey] = a
+	}
+
 	return MetaFields{
 		Meta: m,
 	}

@@ -25,6 +25,16 @@ func main() {
 	},
 	})
 
+	m := jlog.MetaPairs("foo", 5, true, struct{Dog int32}{55})
+
+	Log.InfoWithMeta(m, "bar", struct {
+		Foo  string `json:"foo"`
+		Butt Buff   `json:"buff"`
+	}{"bar", Buff{
+		Bagel: true,
+	},
+	})
+
 	Log.Spaces(5)
 	Log.Info("foo")
 	Log.Spaces(5)
