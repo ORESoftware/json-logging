@@ -3,8 +3,10 @@ package json_logging
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"golang.org/x/crypto/ssh/terminal"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -16,6 +18,26 @@ type jsons struct {
 }
 
 type Logger struct {
+	AppName       string
+	IsLoggingJSON bool
+	HostName      string
+	ForceJSON     bool
+	ForceNonJSON  bool
+}
+
+type loggingTypeInternal struct {
+	JSON string
+	Pretty string
+}
+
+var LoggingType = loggingTypeInternal{
+	JSON:   "JSON",
+	Pretty: "Pretty",
+}
+
+var loggingTypeMap = make(map[string]string)
+
+type LoggerParams struct {
 	AppName       string
 	IsLoggingJSON bool
 	HostName      string
@@ -42,6 +64,36 @@ func New(AppName string, forceJSON bool, hostName string) *Logger {
 		IsLoggingJSON: !isTerminal && !forceJSON,
 		AppName:       AppName,
 		HostName:      hostName,
+	}
+}
+
+func NewLogger(AppName string, forceJSON bool, hostName string) *Logger {
+
+	if hostName == "" {
+
+		hn, err := os.Hostname()
+
+		if err != nil {
+			DefaultLogger.Warn("Could not grab hostname from env.")
+			hostName = "unknown_hostname"
+		} else {
+			hostName = hn
+		}
+
+	}
+
+	return &Logger{
+		IsLoggingJSON: !isTerminal && !forceJSON,
+		AppName:       AppName,
+		HostName:      hostName,
+	}
+}
+
+func (l Logger) Create(m *MetaFields)  *Logger {
+	return &Logger{
+		IsLoggingJSON: l.IsLoggingJSON,
+		AppName:       l.AppName,
+		HostName:      l.HostName,
 	}
 }
 
@@ -157,4 +209,12 @@ var DefaultLogger = Logger{
 
 func init() {
 
+	v := reflect.ValueOf(LoggingType)
+	t := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		loggingTypeMap[t.Field(i).Name] = v.Field(i).Interface().(string)
+	}
+
+	fmt.Println(loggingTypeMap)
 }
