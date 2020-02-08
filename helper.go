@@ -20,27 +20,27 @@ func handleMap(m reflect.Value, ln int, brk bool, depth int) string {
 	keys := m.MapKeys()
 
 	n := len(keys)
-	s := aurora.Bold("map(").String()
+	s := createSpaces(depth, brk) + aurora.Bold("map(").String() + createNewline(brk, true)
 
 	for i, k := range keys {
 		val := m.MapIndex(k)
-		s += getStringRepresentation(k.Interface(), ln, brk, depth) + " => " +
+		s += createSpaces(depth, brk) + getStringRepresentation(k.Interface(), ln, brk, depth) + " => " +
 			getStringRepresentation(val.Interface(), ln, brk, depth) + addComma(i, n)
 	}
 
-	return s + aurora.Bold(")").String()
+	return s + createNewline(brk, true) + aurora.Bold(")").String()
 }
 
 func handleSliceAndArray(val reflect.Value, len int, brk bool, depth int) string {
 
-	s := aurora.Bold("[").String()
+	s := createSpaces(depth, brk) + aurora.Bold("[").String()
 
 	n := val.Len()
 	for i := 0; i < n; i++ {
-		s += getStringRepresentation(val.Index(i).Interface(), len, brk, depth) + addComma(i, n)
+		s += createSpaces(depth, brk) + getStringRepresentation(val.Index(i).Interface(), len, brk, depth) + addComma(i, n)
 	}
 
-	return s + aurora.Bold("]").String()
+	return s + createNewline(brk, true) + aurora.Bold("]").String()
 }
 
 func createNewline(brk bool, also bool) string {
@@ -68,9 +68,11 @@ func handleStruct(val reflect.Value, ln int, brk bool, depth int) string {
 	n := val.NumField()
 	t := val.Type()
 
-	if ln > 20 {
+	if n > 2 {
 		brk = true
 	}
+
+	//log.Println("ln:", ln)
 
 	s := createSpaces(depth, brk) + "{" + createNewline(brk, n > 0)
 
