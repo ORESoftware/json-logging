@@ -8,7 +8,6 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -119,11 +118,15 @@ func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 		break
 
 	case "DEBUG":
-		stylizedLevel = aurora.BgBrightYellow(level).String()
+		stylizedLevel = aurora.Bold(level).String()
 		break
 
 	case "INFO":
 		stylizedLevel = aurora.Gray(12,level).String()
+		break
+
+	case "TRACE":
+		stylizedLevel = aurora.Gray(4,level).String()
 		break
 	}
 
@@ -139,32 +142,32 @@ func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 
 	for _, v := range *args {
 
-		name := reflect.TypeOf(v).Name()
-
-		if name == "string" {
-			os.Stdout.Write([]byte(v.(string) + " "))
-			continue
-		}
-
-		if name == "bool" {
-			os.Stdout.Write([]byte(aurora.BrightBlue(strconv.FormatBool(v.(bool))).String() + " "))
-			continue
-		}
-
-		if name == "int64" {
-			os.Stdout.Write([]byte(aurora.Yellow(strconv.FormatInt(v.(int64), 4)).String() + " "))
-			continue
-		}
-
-		if name == "int32" {
-			os.Stdout.Write([]byte(aurora.Yellow(strconv.Itoa(v.(int))).String() + " "))
-			continue
-		}
-
-		if name == "int" {
-			os.Stdout.Write([]byte(aurora.Yellow(strconv.Itoa(v.(int))).String() + " "))
-			continue
-		}
+		//name := reflect.TypeOf(v).Name()
+		//
+		//if name == "string" {
+		//	os.Stdout.Write([]byte(v.(string) + " "))
+		//	continue
+		//}
+		//
+		//if name == "bool" {
+		//	os.Stdout.Write([]byte(aurora.BrightBlue(strconv.FormatBool(v.(bool))).String() + " "))
+		//	continue
+		//}
+		//
+		//if name == "int64" {
+		//	os.Stdout.Write([]byte(aurora.Yellow(strconv.FormatInt(v.(int64), 4)).String() + " "))
+		//	continue
+		//}
+		//
+		//if name == "int32" {
+		//	os.Stdout.Write([]byte(aurora.Yellow(strconv.Itoa(v.(int))).String() + " "))
+		//	continue
+		//}
+		//
+		//if name == "int" {
+		//	os.Stdout.Write([]byte(aurora.Yellow(strconv.Itoa(v.(int))).String() + " "))
+		//	continue
+		//}
 
 		os.Stdout.Write([]byte(getPrettyString(v) + " "))
 	}
@@ -294,7 +297,7 @@ func (l Logger) Tabs(num int32) {
 
 func (l Logger) Stdout(args ...interface{}) {
 	for _, a := range args {
-		v := fmt.Sprintf("%#v ", a)
+		v := fmt.Sprintf("((%T) %#v) ", a)
 		os.Stdout.Write([]byte(v))
 	}
 	os.Stdout.Write([]byte("\n"))
@@ -302,7 +305,7 @@ func (l Logger) Stdout(args ...interface{}) {
 
 func (l Logger) Stderr(args ...interface{}) {
 	for _, a := range args {
-		v := fmt.Sprintf("%#v ", a, a)
+		v := fmt.Sprintf("((%T) %#v) ", a, a)
 		os.Stderr.Write([]byte(v))
 	}
 	os.Stderr.Write([]byte("\n"))

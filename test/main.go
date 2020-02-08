@@ -19,7 +19,7 @@ func (z Zoom) Zoom() string{
 func main() {
 
 
-	Log.Warn([3]interface{}{"foo","bar", struct{foo string}{"fu"}})
+	Log.Warn([3]interface{}{"foo","bar", struct{Foo string}{"fu"}})
 
 	Log.Info(" ag ageg a gae")
 

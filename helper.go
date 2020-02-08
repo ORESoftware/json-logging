@@ -3,6 +3,7 @@ package json_logging
 import (
 	"github.com/logrusorgru/aurora"
 	"reflect"
+	"runtime"
 	"strconv"
 	"unsafe"
 )
@@ -62,12 +63,10 @@ func handleStruct(val reflect.Value, depth int) string {
 		//rs := reflect.ValueOf(val.Interface()).Elem()
 		//rf := rs.Field(i)
 
+		// note technique stolen from here: https://stackoverflow.com/a/43918797/12211419
 		rs := reflect.New(t).Elem()
-
 		rs.Set(val)
-
 		rf := rs.Field(i)
-
 		rf = reflect.NewAt(rf.Type(), unsafe.Pointer(rf.UnsafeAddr())).Elem()
 
 
@@ -109,7 +108,7 @@ func getStringRepresentation(v interface{}, depth int) string {
 	}
 
 	if val.Kind() == reflect.Func {
-		return " (func)"
+		return "(" + runtime.FuncForPC(val.Pointer()).Name() + "(func))"
 	}
 
 	if val.Kind() == reflect.Struct {
