@@ -7,8 +7,8 @@ import (
 
 type Zoom struct {
 	Bagel bool
+	K     struct{}
 	Val   int
-	Z     struct{}
 }
 
 func (z Zoom) Zoom() string{
@@ -39,7 +39,7 @@ func main() {
 	}{"bar", Zoom{
 		Bagel: false,
 		Val:   33,
-		Z: struct {
+		K: struct {
 		}{},
 	}})
 

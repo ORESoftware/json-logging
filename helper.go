@@ -15,45 +15,69 @@ func addComma(i int, n int) string {
 	return ""
 }
 
-func handleMap(m reflect.Value, depth int) string {
+func handleMap(m reflect.Value, ln int, brk bool, depth int) string {
 
 	keys := m.MapKeys()
 
 	n := len(keys)
-	s := aurora.Bold(" map(").String()
+	s := aurora.Bold("map(").String()
 
 	for i, k := range keys {
 		val := m.MapIndex(k)
-		s += getStringRepresentation(k.Interface(), depth) + " => " +
-			getStringRepresentation(val.Interface(), depth) + addComma(i, n)
+		s += getStringRepresentation(k.Interface(), ln, brk, depth) + " => " +
+			getStringRepresentation(val.Interface(), ln, brk, depth) + addComma(i, n)
 	}
 
 	return s + aurora.Bold(")").String()
 }
 
-func handleSliceAndArray(val reflect.Value, depth int) string {
+func handleSliceAndArray(val reflect.Value, len int, brk bool, depth int) string {
 
 	s := aurora.Bold("[").String()
 
 	n := val.Len()
 	for i := 0; i < n; i++ {
-		s += getStringRepresentation(val.Index(i).Interface(), depth) + addComma(i, n)
+		s += getStringRepresentation(val.Index(i).Interface(), len, brk, depth) + addComma(i, n)
 	}
 
 	return s + aurora.Bold("]").String()
 }
 
-func handleStruct(val reflect.Value, depth int) string {
+func createNewline(brk bool, also bool) string {
+	if brk && also {
+		return "\n"
+	}
+	return ""
+}
+
+func createSpaces(n int, brk bool) string {
+
+	if !brk {
+		return ""
+	}
+
+	v := ""
+	for i := 0; i < n; i++ {
+		v += " "
+	}
+	return v
+}
+
+func handleStruct(val reflect.Value, ln int, brk bool, depth int) string {
 
 	n := val.NumField()
 	t := val.Type()
 
-	s := "{"
+	if ln > 20 {
+		brk = true
+	}
+
+	s := createSpaces(depth, brk) + "{" + createNewline(brk, n > 0)
 
 	for i := 0; i < n; i++ {
 
 		k := t.Field(i).Name
-		s += " " + k + ": "
+		s += createSpaces(depth, brk) + k + ":"
 
 		//if strings.ToLower(k[:1]) == k[:1] {
 		//	s += "(unknown val)"
@@ -62,13 +86,12 @@ func handleStruct(val reflect.Value, depth int) string {
 
 		//rs := reflect.ValueOf(val.Interface()).Elem()
 		//rf := rs.Field(i)
-
 		// note technique stolen from here: https://stackoverflow.com/a/43918797/12211419
+
 		rs := reflect.New(t).Elem()
 		rs.Set(val)
 		rf := rs.Field(i)
 		rf = reflect.NewAt(rf.Type(), unsafe.Pointer(rf.UnsafeAddr())).Elem()
-
 
 		//if val.CanInterface() {
 		//	s += "(unknown val)"
@@ -77,34 +100,36 @@ func handleStruct(val reflect.Value, depth int) string {
 
 		//fv := val.FieldByName(k)
 		//fmt.Println(fv.Interface()) // 2
-
 		//v := val.Field(i).Interface()
 
 		v := rf.Interface()
 
 		//v := fv.Interface()
-		s += getStringRepresentation(v, depth+1) + addComma(i, n)
+		z := getStringRepresentation(v, ln, brk, depth+1)
+		ln = ln + len(z)
+		//log.Println("m:", ln)
+		s += createSpaces(depth, brk) + z + addComma(i, n) + createNewline(brk, true)
 	}
 
-	s += " }"
+	s += createSpaces(depth, brk) + "}" + createNewline(brk, true)
 
 	return s
 }
 
-func getStringRepresentation(v interface{}, depth int) string {
+func getStringRepresentation(v interface{}, len int, brk bool, depth int) string {
 
 	val := reflect.ValueOf(v)
 
 	if val.Kind() == reflect.Map {
-		return handleMap(val, depth)
+		return handleMap(val, len, brk, depth)
 	}
 
 	if val.Kind() == reflect.Slice {
-		return handleSliceAndArray(val, depth)
+		return handleSliceAndArray(val, len, brk, depth)
 	}
 
 	if val.Kind() == reflect.Array {
-		return handleSliceAndArray(val, depth)
+		return handleSliceAndArray(val, len, brk, depth)
 	}
 
 	if val.Kind() == reflect.Func {
@@ -112,7 +137,7 @@ func getStringRepresentation(v interface{}, depth int) string {
 	}
 
 	if val.Kind() == reflect.Struct {
-		return handleStruct(val, depth)
+		return handleStruct(val, len, brk, depth)
 	}
 
 	if _, ok := v.(string); ok {
@@ -136,5 +161,5 @@ func getStringRepresentation(v interface{}, depth int) string {
 }
 
 func getPrettyString(v interface{}) string {
-	return getStringRepresentation(v, 0)
+	return getStringRepresentation(v, 0, false, 0)
 }
