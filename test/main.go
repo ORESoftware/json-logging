@@ -12,6 +12,8 @@ func main() {
 		Z     struct{}
 	}
 
+	Log.Stdout("foo", 55, true, struct{ Boo string }{"fudge"}, map[string]string{"fpp": "age"})
+
 	Log.Info(map[string]interface{}{"foo": 5}, "bar", struct {
 		Foo  string `json:"foo"`
 		Butt Zoom   `json:"buff"`
@@ -27,11 +29,8 @@ func main() {
 		Bagel: false,
 		Val:   33,
 		Z: struct {
-
 		}{},
 	}})
-
-
 
 	//m := jlog.MetaPairs("foo", 5, "zgage", "vv")
 	//

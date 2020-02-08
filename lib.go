@@ -293,16 +293,18 @@ func (l Logger) Tabs(num int32) {
 
 func (l Logger) Stdout(args ...interface{}) {
 	for _, a := range args {
-		v := fmt.Sprintf("%T %#v", a, a)
+		v := fmt.Sprintf("%#v ", a)
 		os.Stdout.Write([]byte(v))
 	}
+	os.Stdout.Write([]byte("\n"))
 }
 
 func (l Logger) Stderr(args ...interface{}) {
 	for _, a := range args {
-		v := fmt.Sprintf("%T %#v", a, a)
+		v := fmt.Sprintf("%#v ", a, a)
 		os.Stderr.Write([]byte(v))
 	}
+	os.Stderr.Write([]byte("\n"))
 }
 
 
