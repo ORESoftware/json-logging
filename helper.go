@@ -1,10 +1,10 @@
 package json_logging
 
 import (
-	"fmt"
 	"github.com/logrusorgru/aurora"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 func addComma(i int, n int) string {
@@ -18,12 +18,12 @@ func handleMap(m reflect.Value, depth int) string {
 
 	keys := m.MapKeys()
 
+	n := len(keys)
 	s := "map ("
 
 	for i, k := range keys {
-		fmt.Println("i:", i, "k:", k)
 		val := m.MapIndex(k)
-		fmt.Println("value:", val)
+		s += getStringRepresentation(k, depth) + " => " + getStringRepresentation(val, depth) + addComma(i, n)
 	}
 
 	return s + ")"
@@ -44,27 +44,13 @@ func handleStruct(val reflect.Value, depth int) string {
 
 		k := t.Field(i).Name
 		s += " " + k + ": "
+
+		if strings.ToLower(k[1:]) == k[1:] {
+			s += "(unknown val)"
+			continue
+		}
+
 		v := val.Field(i).Interface()
-
-		if _, ok := v.(string); ok {
-			s += "'" + aurora.Green(v.(string)).String() + "'" + addComma(i, n)
-			continue
-		}
-
-		if _, ok := v.(bool); ok {
-			s += aurora.Yellow(strconv.FormatBool(v.(bool))).String() + addComma(i, n)
-			continue
-		}
-
-		if _, ok := v.(int64); ok {
-			s += aurora.Blue(strconv.FormatInt(v.(int64), 1)).String() + addComma(i, n)
-			continue
-		}
-
-		if _, ok := v.(int); ok {
-			s += aurora.Blue(strconv.Itoa(v.(int))).String() + addComma(i, n)
-			continue
-		}
 
 		s += getStringRepresentation(v, depth+1)
 	}
@@ -95,10 +81,26 @@ func getStringRepresentation(v interface{}, depth int) string {
 	}
 
 	if val.Kind() == reflect.Struct {
-		return " (func)"
+		return handleStruct(val, depth)
 	}
 
-	return "(unknonwn type)"
+	if _, ok := v.(string); ok {
+		return "'" + aurora.Green(v.(string)).String() + "'"
+	}
+
+	if _, ok := v.(bool); ok {
+		return aurora.Yellow(strconv.FormatBool(v.(bool))).String()
+	}
+
+	if _, ok := v.(int64); ok {
+		return aurora.Blue(strconv.FormatInt(v.(int64), 1)).String()
+	}
+
+	if _, ok := v.(int); ok {
+		return aurora.Blue(strconv.Itoa(v.(int))).String()
+	}
+
+	return " (unknown type)"
 
 }
 
@@ -106,43 +108,3 @@ func getPrettyString(v interface{}) string {
 	return getStringRepresentation(v, 0)
 }
 
-func getPrettyString2(v interface{}) string {
-
-	s := ""
-
-	recurse1 := func(z interface{}) {
-
-		val := reflect.ValueOf(z)
-		t := val.Type()
-
-		for i := 0; i < val.NumField(); i++ {
-
-			k := t.Field(i).Name
-			s += k
-			v := val.Field(i).Interface()
-
-			if _, ok := v.(string); ok {
-				s += " '" + v.(string) + "',"
-				continue
-			}
-
-			if _, ok := v.(bool); ok {
-				s += " '" + strconv.FormatBool(v.(bool)) + "',"
-				continue
-			}
-
-			if _, ok := v.(int); ok {
-				s += " '" + strconv.FormatInt(v.(int64), 1) + "',"
-				continue
-			}
-
-			//recurse1(nil)
-
-		}
-
-	}
-
-	recurse1(v)
-
-	return s
-}
