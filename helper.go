@@ -37,12 +37,17 @@ func recurse(s string, v interface{}) string {
 			continue
 		}
 
-		if _, ok := v.(int); ok {
+		if _, ok := v.(int64); ok {
 			s += aurora.Blue(strconv.FormatInt(v.(int64), 1)).String() + addComma(i, n)
 			continue
 		}
 
-		s += recurse(s, v)
+		if _, ok := v.(int); ok {
+			s += aurora.Blue(strconv.Itoa(v.(int))).String() + addComma(i, n)
+			continue
+		}
+
+		s += recurse("", v)
 	}
 
 	s += " }"
