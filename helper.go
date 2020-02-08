@@ -1,25 +1,44 @@
 package json_logging
 
 import (
+	"fmt"
 	"github.com/logrusorgru/aurora"
 	"reflect"
 	"strconv"
 )
 
 func addComma(i int, n int) string {
-	if i < n - 1 {
+	if i < n-1 {
 		return ","
 	}
 	return ""
 }
 
-func recurse(s string, v interface{}) string {
+func handleMap(m reflect.Value, depth int) string {
 
-	val := reflect.ValueOf(v)
-	t := val.Type()
+	keys := m.MapKeys()
+
+	s := "map ("
+
+	for i, k := range keys {
+		fmt.Println("i:", i, "k:", k)
+		val := m.MapIndex(k)
+		fmt.Println("value:", val)
+	}
+
+	return s + ")"
+}
+
+func handleSliceAndArray(m []interface{}, depth int) string {
+	return ""
+}
+
+func handleStruct(val reflect.Value, depth int) string {
+
 	n := val.NumField()
+	t := val.Type()
 
-	s += "{"
+	s := "{"
 
 	for i := 0; i < n; i++ {
 
@@ -28,7 +47,7 @@ func recurse(s string, v interface{}) string {
 		v := val.Field(i).Interface()
 
 		if _, ok := v.(string); ok {
-			s += "'" + aurora.Green(  v.(string)).String() + "'" + addComma(i, n)
+			s += "'" + aurora.Green(v.(string)).String() + "'" + addComma(i, n)
 			continue
 		}
 
@@ -47,7 +66,7 @@ func recurse(s string, v interface{}) string {
 			continue
 		}
 
-		s += recurse("", v)
+		s += getStringRepresentation(v, depth+1)
 	}
 
 	s += " }"
@@ -55,8 +74,36 @@ func recurse(s string, v interface{}) string {
 	return s
 }
 
+func getStringRepresentation(v interface{}, depth int) string {
+
+	val := reflect.ValueOf(v)
+
+	if val.Kind() == reflect.Map {
+		return handleMap(val, depth)
+	}
+
+	if val.Kind() == reflect.Slice {
+		return handleSliceAndArray(v.([]interface{}), depth)
+	}
+
+	if val.Kind() == reflect.Array {
+		return handleSliceAndArray(v.([]interface{}), depth)
+	}
+
+	if val.Kind() == reflect.Func {
+		return " (func)"
+	}
+
+	if val.Kind() == reflect.Struct {
+		return " (func)"
+	}
+
+	return "(unknonwn type)"
+
+}
+
 func getPrettyString(v interface{}) string {
-	return recurse("", v)
+	return getStringRepresentation(v, 0)
 }
 
 func getPrettyString2(v interface{}) string {
