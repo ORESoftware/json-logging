@@ -2,7 +2,6 @@ package json_logging
 
 import (
 	"github.com/logrusorgru/aurora"
-	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -10,7 +9,7 @@ import (
 
 func addComma(i int, n int) string {
 	if i < n-1 {
-		return ","
+		return ", "
 	}
 	return ""
 }
@@ -20,20 +19,27 @@ func handleMap(m reflect.Value, depth int) string {
 	keys := m.MapKeys()
 
 	n := len(keys)
-	s := "map ("
+	s := aurora.Bold(" map(").String()
 
 	for i, k := range keys {
-		log.Print(i,k)
 		val := m.MapIndex(k)
 		s += getStringRepresentation(k.Interface(), depth) + " => " +
 			getStringRepresentation(val.Interface(), depth) + addComma(i, n)
 	}
 
-	return s + ")"
+	return s + aurora.Bold(")").String()
 }
 
-func handleSliceAndArray(m []interface{}, depth int) string {
-	return ""
+func handleSliceAndArray(val reflect.Value, depth int) string {
+
+	s := aurora.Bold("[").String()
+
+	n := val.Len()
+	for i := 0; i < n; i++ {
+		s += getStringRepresentation(val.Index(i).Interface(), depth) + addComma(i, n)
+	}
+
+	return s + aurora.Bold("]").String()
 }
 
 func handleStruct(val reflect.Value, depth int) string {
@@ -55,7 +61,7 @@ func handleStruct(val reflect.Value, depth int) string {
 
 		v := val.Field(i).Interface()
 
-		s += getStringRepresentation(v, depth+1) + addComma(i,n)
+		s += getStringRepresentation(v, depth+1) + addComma(i, n)
 	}
 
 	s += " }"
@@ -72,11 +78,11 @@ func getStringRepresentation(v interface{}, depth int) string {
 	}
 
 	if val.Kind() == reflect.Slice {
-		return handleSliceAndArray(v.([]interface{}), depth)
+		return handleSliceAndArray(val, depth)
 	}
 
 	if val.Kind() == reflect.Array {
-		return handleSliceAndArray(v.([]interface{}), depth)
+		return handleSliceAndArray(val, depth)
 	}
 
 	if val.Kind() == reflect.Func {
@@ -92,15 +98,15 @@ func getStringRepresentation(v interface{}, depth int) string {
 	}
 
 	if _, ok := v.(bool); ok {
-		return aurora.Yellow(strconv.FormatBool(v.(bool))).String()
+		return aurora.BrightBlue(strconv.FormatBool(v.(bool))).String()
 	}
 
 	if _, ok := v.(int64); ok {
-		return aurora.Blue(strconv.FormatInt(v.(int64), 1)).String()
+		return aurora.Yellow(strconv.FormatInt(v.(int64), 1)).String()
 	}
 
 	if _, ok := v.(int); ok {
-		return aurora.Blue(strconv.Itoa(v.(int))).String()
+		return aurora.Yellow(strconv.Itoa(v.(int))).String()
 	}
 
 	return " (unknown type)"
@@ -110,4 +116,3 @@ func getStringRepresentation(v interface{}, depth int) string {
 func getPrettyString(v interface{}) string {
 	return getStringRepresentation(v, 0)
 }
-

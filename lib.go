@@ -123,14 +123,14 @@ func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 		break
 
 	case "INFO":
-		stylizedLevel = aurora.BrightBlue(level).String()
+		stylizedLevel = aurora.Gray(12,level).String()
 		break
 	}
 
 	buf := []string{
 		aurora.Gray(9, date).String(), " ",
 		stylizedLevel, " ",
-		"app:" + aurora.Cyan(l.AppName).String(), " ",
+		aurora.Gray(12,"app:").String() + aurora.Italic(l.AppName).String(), " ",
 	}
 
 	for _, v := range buf {
@@ -147,25 +147,26 @@ func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 		}
 
 		if name == "bool" {
-			os.Stdout.Write([]byte(aurora.Yellow(strconv.FormatBool(v.(bool))).String() + " "))
+			os.Stdout.Write([]byte(aurora.BrightBlue(strconv.FormatBool(v.(bool))).String() + " "))
 			continue
 		}
 
 		if name == "int64" {
-			os.Stdout.Write([]byte(aurora.Blue(strconv.FormatInt(v.(int64), 4)).String() + " "))
+			os.Stdout.Write([]byte(aurora.Yellow(strconv.FormatInt(v.(int64), 4)).String() + " "))
+			continue
+		}
+
+		if name == "int32" {
+			os.Stdout.Write([]byte(aurora.Yellow(strconv.Itoa(v.(int))).String() + " "))
+			continue
+		}
+
+		if name == "int" {
+			os.Stdout.Write([]byte(aurora.Yellow(strconv.Itoa(v.(int))).String() + " "))
 			continue
 		}
 
 		os.Stdout.Write([]byte(getPrettyString(v) + " "))
-
-		//json, err := json.Marshal(v)
-		//if err != nil {
-		//	z := fmt.Sprintf("%v", v)
-		//	os.Stdout.Write([]byte(z + " "))
-		//	continue
-		//}
-		//
-		//os.Stdout.Write(json)
 	}
 
 	os.Stdout.Write([]byte("\n"))
