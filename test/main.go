@@ -9,7 +9,7 @@ func main() {
 
 	type Buff struct{ Bagel bool }
 
-	Log.Info("foo", struct {
+	Log.Info(Buff{}, struct {
 		Foo  string `json:"foo"`
 		Butt Buff   `json:"buff"`
 	}{"bar", Buff{
@@ -35,11 +35,7 @@ func main() {
 	},
 	})
 
-	Log.Spaces(5)
 	Log.Info("foo")
-	Log.Spaces(5)
-	Log.NewLine()
-	Log.Spaces(8)
-	Log.NewLine()
+
 
 }

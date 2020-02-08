@@ -5,8 +5,9 @@ console.log("foo");
 
 console.log(util.inspect("foo", {colors: true}));
 
+console.log(util.inspect(new Set(['ag', 'age', true]), {colors: true}))
 console.log(util.inspect({
-    "foo": "bar",
+    "foo": "'bar'",
     "star": true,
     bar: 'car',
     boop: 555

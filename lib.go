@@ -139,24 +139,34 @@ func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 
 	for _, v := range *args {
 
-		if reflect.TypeOf(v).Name() == "string" {
+		name := reflect.TypeOf(v).Name()
+
+		if name  == "string" {
 			os.Stdout.Write([]byte(v.(string) + " "))
 			continue
 		}
 
-		if reflect.TypeOf(v).Name() == "bool" {
-			os.Stdout.Write([]byte(strconv.FormatBool(v.(bool)) + " "))
+		if name == "bool" {
+			os.Stdout.Write([]byte(aurora.Yellow(strconv.FormatBool(v.(bool))).String() + " "))
 			continue
 		}
 
-		json, err := json.Marshal(v)
-		if err != nil {
-			z := fmt.Sprintf("%v", v)
-			os.Stdout.Write([]byte(z + " "))
+		if name == "int64" {
+			os.Stdout.Write([]byte(aurora.Blue(strconv.FormatInt(v.(int64), 4)).String() + " "))
 			continue
 		}
 
-		os.Stdout.Write(json)
+
+		os.Stdout.Write([]byte(getPrettyString(v) + " "))
+
+		//json, err := json.Marshal(v)
+		//if err != nil {
+		//	z := fmt.Sprintf("%v", v)
+		//	os.Stdout.Write([]byte(z + " "))
+		//	continue
+		//}
+		//
+		//os.Stdout.Write(json)
 	}
 
 	os.Stdout.Write([]byte("\n"))
