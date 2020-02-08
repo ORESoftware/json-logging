@@ -141,7 +141,7 @@ func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 
 		name := reflect.TypeOf(v).Name()
 
-		if name  == "string" {
+		if name == "string" {
 			os.Stdout.Write([]byte(v.(string) + " "))
 			continue
 		}
@@ -155,7 +155,6 @@ func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 			os.Stdout.Write([]byte(aurora.Blue(strconv.FormatInt(v.(int64), 4)).String() + " "))
 			continue
 		}
-
 
 		os.Stdout.Write([]byte(getPrettyString(v) + " "))
 
@@ -291,6 +290,21 @@ func (l Logger) Spaces(num int32) {
 func (l Logger) Tabs(num int32) {
 	os.Stdout.Write([]byte(strings.Join(make([]string, num), "\t")))
 }
+
+func (l Logger) Stdout(args ...interface{}) {
+	for _, a := range args {
+		v := fmt.Sprintf("%T %#v", a, a)
+		os.Stdout.Write([]byte(v))
+	}
+}
+
+func (l Logger) Stderr(args ...interface{}) {
+	for _, a := range args {
+		v := fmt.Sprintf("%T %#v", a, a)
+		os.Stderr.Write([]byte(v))
+	}
+}
+
 
 var DefaultLogger = Logger{
 	AppName:       "Default",

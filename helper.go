@@ -2,6 +2,7 @@ package json_logging
 
 import (
 	"github.com/logrusorgru/aurora"
+	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ func handleMap(m reflect.Value, depth int) string {
 	s := "map ("
 
 	for i, k := range keys {
+		log.Print(i,k)
 		val := m.MapIndex(k)
 		s += getStringRepresentation(k, depth) + " => " + getStringRepresentation(val, depth) + addComma(i, n)
 	}
@@ -52,7 +54,7 @@ func handleStruct(val reflect.Value, depth int) string {
 
 		v := val.Field(i).Interface()
 
-		s += getStringRepresentation(v, depth+1)
+		s += getStringRepresentation(v, depth+1) + addComma(i,n)
 	}
 
 	s += " }"
