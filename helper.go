@@ -68,7 +68,7 @@ func handleStruct(val reflect.Value, ln int, brk bool, depth int) string {
 	n := val.NumField()
 	t := val.Type()
 
-	if n > 2 {
+	if n > 299 {
 		brk = true
 	}
 
