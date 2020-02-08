@@ -45,7 +45,7 @@ func handleStruct(val reflect.Value, depth int) string {
 		k := t.Field(i).Name
 		s += " " + k + ": "
 
-		if strings.ToLower(k[1:]) == k[1:] {
+		if strings.ToLower(k[:1]) == k[:1] {
 			s += "(unknown val)"
 			continue
 		}
