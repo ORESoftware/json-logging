@@ -25,7 +25,8 @@ func handleMap(m reflect.Value, depth int) string {
 	for i, k := range keys {
 		log.Print(i,k)
 		val := m.MapIndex(k)
-		s += getStringRepresentation(k, depth) + " => " + getStringRepresentation(val, depth) + addComma(i, n)
+		s += getStringRepresentation(k.Interface(), depth) + " => " +
+			getStringRepresentation(val.Interface(), depth) + addComma(i, n)
 	}
 
 	return s + ")"
