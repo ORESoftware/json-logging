@@ -4,7 +4,7 @@ import (
 	"github.com/logrusorgru/aurora"
 	"reflect"
 	"strconv"
-	"strings"
+	"unsafe"
 )
 
 func addComma(i int, n int) string {
@@ -54,10 +54,22 @@ func handleStruct(val reflect.Value, depth int) string {
 		k := t.Field(i).Name
 		s += " " + k + ": "
 
-		if strings.ToLower(k[:1]) == k[:1] {
-			s += "(unknown val)"
-			continue
-		}
+		//if strings.ToLower(k[:1]) == k[:1] {
+		//	s += "(unknown val)"
+		//	continue
+		//}
+
+		//rs := reflect.ValueOf(val.Interface()).Elem()
+		//rf := rs.Field(i)
+
+		rs := reflect.New(t).Elem()
+
+		rs.Set(val)
+
+		rf := rs.Field(i)
+
+		rf = reflect.NewAt(rf.Type(), unsafe.Pointer(rf.UnsafeAddr())).Elem()
+
 
 		//if val.CanInterface() {
 		//	s += "(unknown val)"
@@ -67,7 +79,9 @@ func handleStruct(val reflect.Value, depth int) string {
 		//fv := val.FieldByName(k)
 		//fmt.Println(fv.Interface()) // 2
 
-		v := val.Field(i).Interface()
+		//v := val.Field(i).Interface()
+
+		v := rf.Interface()
 
 		//v := fv.Interface()
 		s += getStringRepresentation(v, depth+1) + addComma(i, n)

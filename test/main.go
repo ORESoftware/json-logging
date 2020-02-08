@@ -4,17 +4,26 @@ import (
 	. "github.com/oresoftware/json-logging/test/logging"
 )
 
+
+type Zoom struct {
+	Bagel bool
+	Val   int
+	Z     struct{}
+}
+
+func (z Zoom) Zoom() string{
+   return "bop"
+}
+
+
 func main() {
 
-	type Zoom struct {
-		Bagel bool
-		Val   int
-		Z     struct{}
-	}
 
 	Log.Warn([3]interface{}{"foo","bar", struct{foo string}{"fu"}})
 
-	Log.Info("foo", 55, true, struct{ Boo string }{"fudge"}, map[string]string{"fpp": "age"})
+	Log.Info(" ag ageg a gae")
+
+	Log.Info("foo", 55, main, true, struct{ Boo string }{"fudge"}, map[string]string{"fpp": "age"})
 
 	Log.Info(map[string]interface{}{"foo": 5}, "bar", struct {
 		Foo  string `json:"foo"`
