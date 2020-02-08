@@ -12,7 +12,7 @@ func main() {
 		Z     struct{}
 	}
 
-	Log.Warn([3]interface{}{"foo","bar", struct{Foo string}{"fu"}})
+	Log.Warn([3]interface{}{"foo","bar", struct{foo string}{"fu"}})
 
 	Log.Info("foo", 55, true, struct{ Boo string }{"fudge"}, map[string]string{"fpp": "age"})
 

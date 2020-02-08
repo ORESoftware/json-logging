@@ -59,8 +59,17 @@ func handleStruct(val reflect.Value, depth int) string {
 			continue
 		}
 
+		//if val.CanInterface() {
+		//	s += "(unknown val)"
+		//	continue
+		//}
+
+		//fv := val.FieldByName(k)
+		//fmt.Println(fv.Interface()) // 2
+
 		v := val.Field(i).Interface()
 
+		//v := fv.Interface()
 		s += getStringRepresentation(v, depth+1) + addComma(i, n)
 	}
 
