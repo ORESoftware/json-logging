@@ -33,7 +33,7 @@ func main() {
 
 	//Log.Info(Zoom{})
 
-	Log.Info( struct {
+	Log.Info(Zoom{}, Zoom{}, Zoom{}, Zoom{}, struct {
 		Foo  string `json:"foo"`
 		Butt Zoom   `json:"buff"`
 	}{"bar", Zoom{

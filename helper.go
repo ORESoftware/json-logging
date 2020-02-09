@@ -58,12 +58,12 @@ func createSpaces(n int, brk bool) string {
 
 	v := ""
 	for i := 0; i < n; i++ {
-		v += "  "
+		v += " "
 	}
 	return v
 }
 
-func handleStruct(val reflect.Value, ln int, brk bool, depth int) string {
+func handleStruct(val reflect.Value, size int, brk bool, depth int) string {
 
 	n := val.NumField()
 	t := val.Type()
@@ -72,7 +72,6 @@ func handleStruct(val reflect.Value, ln int, brk bool, depth int) string {
 
 	keys := []string{}
 	values := []string{}
-	size := 0
 
 	for i := 0; i < n; i++ {
 
@@ -107,7 +106,7 @@ func handleStruct(val reflect.Value, ln int, brk bool, depth int) string {
 		v := rf.Interface()
 
 		//v := fv.Interface()
-		z := getStringRepresentation(v, ln, brk, depth+2)
+		z := getStringRepresentation(v, size, brk, depth+1)
 
 		values = append(values, z)
 		size = size + len(z)
@@ -118,7 +117,7 @@ func handleStruct(val reflect.Value, ln int, brk bool, depth int) string {
 
 	//log.Println("size:", size, "n:", n)
 
-	if size > 20 - depth {
+	if size > 100 - depth {
 		brk = true
 	}
 
@@ -129,25 +128,25 @@ func handleStruct(val reflect.Value, ln int, brk bool, depth int) string {
 		s += " " + values[i] + addComma(i, n) + createNewline(brk, true)
 	}
 
-	s += createSpaces(depth-2, brk) + "}" + createNewline(brk, false)
+	s += createSpaces(depth-1, brk) + "}" + createNewline(brk, false)
 
 	return s
 }
 
-func getStringRepresentation(v interface{}, len int, brk bool, depth int) string {
+func getStringRepresentation(v interface{}, size int, brk bool, depth int) string {
 
 	val := reflect.ValueOf(v)
 
 	if val.Kind() == reflect.Map {
-		return handleMap(val, len, brk, depth)
+		return handleMap(val, size, brk, depth)
 	}
 
 	if val.Kind() == reflect.Slice {
-		return handleSliceAndArray(val, len, brk, depth)
+		return handleSliceAndArray(val, size, brk, depth)
 	}
 
 	if val.Kind() == reflect.Array {
-		return handleSliceAndArray(val, len, brk, depth)
+		return handleSliceAndArray(val, size, brk, depth)
 	}
 
 	if val.Kind() == reflect.Func {
@@ -155,7 +154,7 @@ func getStringRepresentation(v interface{}, len int, brk bool, depth int) string
 	}
 
 	if val.Kind() == reflect.Struct {
-		return handleStruct(val, len, brk, depth)
+		return handleStruct(val, size, brk, depth)
 	}
 
 	if _, ok := v.(string); ok {
@@ -178,6 +177,6 @@ func getStringRepresentation(v interface{}, len int, brk bool, depth int) string
 
 }
 
-func getPrettyString(v interface{}) string {
-	return getStringRepresentation(v, 0, false, 2)
+func getPrettyString(v interface{}, size int) string {
+	return getStringRepresentation(v, size, false, 2)
 }

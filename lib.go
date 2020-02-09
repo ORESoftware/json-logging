@@ -140,6 +140,7 @@ func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 		os.Stdout.Write([]byte(v))
 	}
 
+	size := 0;
 	for _, v := range *args {
 
 		//name := reflect.TypeOf(v).Name()
@@ -169,7 +170,16 @@ func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 		//	continue
 		//}
 
-		os.Stdout.Write([]byte(getPrettyString(v) + " "))
+		s := getPrettyString(v, size) + " "
+		i := strings.LastIndex(s, "\n")
+		if i >= 0 {
+			size = len(s) - i
+		} else{
+			size = size + len(s)
+		}
+
+		//log.Println("size:", size)
+		os.Stdout.Write([]byte(s))
 	}
 
 	os.Stdout.Write([]byte("\n"))
