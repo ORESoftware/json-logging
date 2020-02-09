@@ -22,18 +22,33 @@ func handleMap(m reflect.Value, size int, brk bool, depth int) string {
 	n := len(keys)
 
 	//s := createSpaces(depth, brk) + aurora.Bold("map(").String() + createNewline(brk, true)
-	s := aurora.Bold("map(").String() + createNewline(brk, true)
+
+	values := []string{}
 
 	for i, k := range keys {
 		val := m.MapIndex(k)
-		s += createSpaces(depth, brk) +
-			getStringRepresentation(k.Interface(), size, brk, depth) +
+
+		z := getStringRepresentation(k.Interface(), size, brk, depth) +
 			" => " +
 			getStringRepresentation(val.Interface(), size, brk, depth) +
 			addComma(i, n)
+
+		size = size + len(z)
+		values = append(values,z)
 	}
 
-	return s + createNewline(brk, true) + aurora.Bold(")").String()
+	if size > 100-depth {
+		brk = true
+		//size = 0
+	}
+
+	s := aurora.Bold("map(").String() + createNewline(brk, true)
+
+	for i := 0; i < n; i++ {
+		s += createSpaces(depth, brk) + values[i] + createNewline(brk, true)
+	}
+
+	return s + aurora.Bold(")").String() + createNewline(brk, true)
 }
 
 func handleSliceAndArray(val reflect.Value, len int, brk bool, depth int) string {
