@@ -34,7 +34,7 @@ func handleMap(m reflect.Value, size int, brk bool, depth int) string {
 			addComma(i, n)
 
 		size = size + len(z)
-		values = append(values,z)
+		values = append(values, z)
 	}
 
 	if size > 100-depth {
@@ -155,9 +155,18 @@ func handleStruct(val reflect.Value, size int, brk bool, depth int) string {
 	return s
 }
 
+func getStringRepFromPointer(v *interface{}, size int, brk bool, depth int) string {
+	return getStringRepresentation(*v, size, brk, depth)
+}
+
 func getStringRepresentation(v interface{}, size int, brk bool, depth int) string {
 
 	val := reflect.ValueOf(v)
+
+	if val.Kind() == reflect.Ptr {
+		v = val.Elem().Interface()
+		val = reflect.ValueOf(v)
+	}
 
 	if val.Kind() == reflect.Map {
 		return handleMap(val, size, brk, depth)
@@ -170,6 +179,10 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 	if val.Kind() == reflect.Array {
 		return handleSliceAndArray(val, size, brk, depth)
 	}
+	//
+	//if val.Kind() == reflect.Ptr {
+	//	return getStringRepFromPointer(&v, size, brk, depth)
+	//}
 
 	if val.Kind() == reflect.Func {
 		return "(" + runtime.FuncForPC(val.Pointer()).Name() + "(func))"

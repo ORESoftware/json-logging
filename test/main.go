@@ -20,7 +20,7 @@ func main() {
 	//
 	//Log.Info(" ag ageg a gae")
 	//
-	Log.Info("foo", 55, main, true, struct{ Boo string }{"fudge"}, map[string]interface{}{"fpp": "age", "boop": struct{
+	Log.Info("foo", 55, main, true, struct{ Boo string }{"fudge"}, map[string]interface{}{"fpp": "age", "boop": &struct{
 		Bop string
 		dog int
 	}{"age", 5}})
