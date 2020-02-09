@@ -15,7 +15,7 @@ func addComma(i int, n int) string {
 	return ""
 }
 
-func handleMap(m reflect.Value, ln int, brk bool, depth int) string {
+func handleMap(m reflect.Value, size int, brk bool, depth int) string {
 
 	keys := m.MapKeys()
 
@@ -24,8 +24,11 @@ func handleMap(m reflect.Value, ln int, brk bool, depth int) string {
 
 	for i, k := range keys {
 		val := m.MapIndex(k)
-		s += createSpaces(depth, brk) + getStringRepresentation(k.Interface(), ln, brk, depth) + " => " +
-			getStringRepresentation(val.Interface(), ln, brk, depth) + addComma(i, n)
+		s += createSpaces(depth, brk) +
+			getStringRepresentation(k.Interface(), size, brk, depth) +
+			" => " +
+			getStringRepresentation(val.Interface(), size, brk, depth) +
+			addComma(i, n)
 	}
 
 	return s + createNewline(brk, true) + aurora.Bold(")").String()
@@ -37,7 +40,9 @@ func handleSliceAndArray(val reflect.Value, len int, brk bool, depth int) string
 
 	n := val.Len()
 	for i := 0; i < n; i++ {
-		s += createSpaces(depth, brk) + getStringRepresentation(val.Index(i).Interface(), len, brk, depth) + addComma(i, n)
+		s += createSpaces(depth, brk) +
+			getStringRepresentation(val.Index(i).Interface(), len, brk, depth) +
+			addComma(i, n)
 	}
 
 	return s + createNewline(brk, true) + aurora.Bold("]").String()
