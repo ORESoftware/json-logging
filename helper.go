@@ -74,13 +74,17 @@ func handleStruct(val reflect.Value, ln int, brk bool, depth int) string {
 
 	//log.Println("ln:", ln)
 
-	s := createSpaces(depth, brk) + "{" + createNewline(brk, n > 0)
+	keys := []string{}
+	values := []string{}
+	size := 0
 
 	for i := 0; i < n; i++ {
 
 		k := t.Field(i).Name
-		s += createSpaces(depth, brk) + k + ":"
+		// keys => s += createSpaces(depth, brk) + k + ":"
 
+		keys = append(keys, k + ":")
+		size = size + len(keys)
 		//if strings.ToLower(k[:1]) == k[:1] {
 		//	s += "(unknown val)"
 		//	continue
@@ -108,9 +112,25 @@ func handleStruct(val reflect.Value, ln int, brk bool, depth int) string {
 
 		//v := fv.Interface()
 		z := getStringRepresentation(v, ln, brk, depth+1)
-		ln = ln + len(z)
+
+		values = append(values, z)
+		size = size + len(values)
+
 		//log.Println("m:", ln)
-		s += createSpaces(depth, brk) + z + addComma(i, n) + createNewline(brk, true)
+		//s += createSpaces(depth, brk) + z + addComma(i, n) + createNewline(brk, true)
+	}
+
+	//log.Println("size:", size)
+
+	if size > 8 {
+		brk = true
+	}
+
+	s := createSpaces(depth, brk) + "{" + createNewline(brk, n > 0)
+
+	for i := 0; i < n; i++ {
+		s += createSpaces(depth, brk) + keys[i]
+		s += createSpaces(depth, brk) + values[i] + addComma(i, n) + createNewline(brk, true)
 	}
 
 	s += createSpaces(depth, brk) + "}" + createNewline(brk, true)
