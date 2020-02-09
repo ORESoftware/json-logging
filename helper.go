@@ -122,7 +122,7 @@ func handleStruct(val reflect.Value, size int, brk bool, depth int) string {
 
 	//log.Println("size:", size, "n:", n)
 
-	if size > 100 - depth {
+	if size > 100-depth {
 		brk = true
 	}
 
