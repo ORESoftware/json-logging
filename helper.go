@@ -20,7 +20,9 @@ func handleMap(m reflect.Value, size int, brk bool, depth int) string {
 	keys := m.MapKeys()
 
 	n := len(keys)
-	s := createSpaces(depth, brk) + aurora.Bold("map(").String() + createNewline(brk, true)
+
+	//s := createSpaces(depth, brk) + aurora.Bold("map(").String() + createNewline(brk, true)
+	s := aurora.Bold("map(").String() + createNewline(brk, true)
 
 	for i, k := range keys {
 		val := m.MapIndex(k)
