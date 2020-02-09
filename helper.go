@@ -28,9 +28,9 @@ func handleMap(m reflect.Value, size int, brk bool, depth int) string {
 	for i, k := range keys {
 		val := m.MapIndex(k)
 
-		z := getStringRepresentation(k.Interface(), size, brk, depth) +
+		z := getStringRepresentation(k.Interface(), size, brk, depth + 1) +
 			" => " +
-			getStringRepresentation(val.Interface(), size, brk, depth) +
+			getStringRepresentation(val.Interface(), size, brk, depth + 1) +
 			addComma(i, n)
 
 		size = size + len(z)
