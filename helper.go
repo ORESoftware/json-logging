@@ -56,9 +56,9 @@ func createSpaces(n int, brk bool) string {
 		return ""
 	}
 
-	v := ""
+	v := "  "
 	for i := 0; i < n; i++ {
-		v += " "
+		v += "  "
 	}
 	return v
 }
@@ -67,10 +67,6 @@ func handleStruct(val reflect.Value, ln int, brk bool, depth int) string {
 
 	n := val.NumField()
 	t := val.Type()
-
-	if n > 299 {
-		brk = true
-	}
 
 	//log.Println("ln:", ln)
 
@@ -126,14 +122,14 @@ func handleStruct(val reflect.Value, ln int, brk bool, depth int) string {
 		brk = true
 	}
 
-	s := createSpaces(depth, brk) + "{" + createNewline(brk, n > 0)
+	s := "{" + createNewline(brk, n > 0)
 
 	for i := 0; i < n; i++ {
 		s += createSpaces(depth, brk) + keys[i]
-		s += createSpaces(depth, brk) + values[i] + addComma(i, n) + createNewline(brk, true)
+		s += " " + values[i] + addComma(i, n) + createNewline(brk, true)
 	}
 
-	s += createSpaces(depth, brk) + "}" + createNewline(brk, true)
+	s += createSpaces(depth - 1, brk) + "}" + createNewline(brk, true)
 
 	return s
 }
