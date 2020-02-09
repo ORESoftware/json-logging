@@ -196,17 +196,63 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 		return "'" + aurora.Green(v.(string)).String() + "'"
 	}
 
+	if val.Kind() == reflect.Bool {
+		return aurora.BrightBlue(strconv.FormatBool(v.(bool))).String()
+	}
+
 	if _, ok := v.(bool); ok {
 		return aurora.BrightBlue(strconv.FormatBool(v.(bool))).String()
+	}
+
+	if val.Kind() == reflect.Int64 {
+		return aurora.Yellow(strconv.FormatInt(v.(int64), 1)).String()
 	}
 
 	if _, ok := v.(int64); ok {
 		return aurora.Yellow(strconv.FormatInt(v.(int64), 1)).String()
 	}
 
+	if val.Kind() == reflect.Int {
+		return aurora.Yellow(strconv.Itoa(v.(int))).String()
+	}
+
 	if _, ok := v.(int); ok {
 		return aurora.Yellow(strconv.Itoa(v.(int))).String()
 	}
+
+	if val.Kind() == reflect.Int32 {
+		return aurora.Yellow(v.(int32)).String()
+	}
+
+	if _, ok := v.(int32); ok {
+		return aurora.Yellow(v.(int32)).String()
+	}
+
+	if val.Kind() == reflect.Int8 {
+		return aurora.Yellow(v.(int8)).String()
+	}
+
+	if _, ok := v.(int8); ok {
+		return aurora.Yellow(v.(int8)).String()
+	}
+
+
+	if val.Kind() == reflect.Int16 {
+		return aurora.Yellow(v.(int16)).String()
+	}
+
+	if _, ok := v.(int16); ok {
+		return aurora.Yellow(v.(int16)).String()
+	}
+
+	if val.Kind() == reflect.Uint {
+		return aurora.Yellow(v.(uint)).String()
+	}
+
+	if _, ok := v.(uint); ok {
+		return aurora.Yellow(v.(uint)).String()
+	}
+
 
 	return " (unknown type)"
 
