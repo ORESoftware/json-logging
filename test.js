@@ -6,8 +6,10 @@ console.log("foo");
 console.log(util.inspect("foo", {colors: true}));
 
 console.log(util.inspect(new Map([['ag', 'age'],[{ffo:""}]]), {colors: true}))
+
+
 console.log(util.inspect({
-    "foo": "'bar'",
+    "foo": "\'bar\'",
     "star": true,
     bar: 'car',
     boop: 555
