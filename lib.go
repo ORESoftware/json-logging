@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	"golang.org/x/crypto/ssh/terminal"
+	"log"
 	"os"
 	"reflect"
 	"strings"
@@ -122,25 +123,25 @@ func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 		break
 
 	case "INFO":
-		stylizedLevel = aurora.Gray(12,level).String()
+		stylizedLevel = aurora.Gray(12, level).String()
 		break
 
 	case "TRACE":
-		stylizedLevel = aurora.Gray(4,level).String()
+		stylizedLevel = aurora.Gray(4, level).String()
 		break
 	}
 
 	buf := []string{
 		aurora.Gray(9, date).String(), " ",
 		stylizedLevel, " ",
-		aurora.Gray(12,"app:").String() + aurora.Italic(l.AppName).String(), " ",
+		aurora.Gray(12, "app:").String() + aurora.Italic(l.AppName).String(), " ",
 	}
 
 	for _, v := range buf {
 		os.Stdout.Write([]byte(v))
 	}
 
-	size := 0;
+	size := 0
 	for _, v := range *args {
 
 		//name := reflect.TypeOf(v).Name()
@@ -174,7 +175,7 @@ func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 		i := strings.LastIndex(s, "\n")
 		if i >= 0 {
 			size = len(s) - i
-		} else{
+		} else {
 			size = size + len(s)
 		}
 
@@ -204,6 +205,19 @@ func (l Logger) writeSwitch(level string, m *MetaFields, args *[]interface{}) {
 		l.writeJSON(level, m, args)
 	} else {
 		l.writePretty(level, m, args)
+	}
+}
+
+func (l Logger) JSON(args ...interface{}) {
+	for i := 0; i < len(args); i++ {
+
+		v, err := json.Marshal(args[i])
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		os.Stdout.Write(v)
 	}
 }
 
@@ -320,7 +334,6 @@ func (l Logger) Stderr(args ...interface{}) {
 	}
 	os.Stderr.Write([]byte("\n"))
 }
-
 
 var DefaultLogger = Logger{
 	AppName:       "Default",
