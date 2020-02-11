@@ -164,8 +164,11 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 	val := reflect.ValueOf(v)
 
 	if val.Kind() == reflect.Ptr {
-		v = val.Elem().Interface()
-		val = reflect.ValueOf(v)
+		//v = val.Elem().Interface()
+		//val = reflect.ValueOf(v)
+
+		val = val.Elem()
+		v = val.Interface()
 	}
 
 	if val.Kind() == reflect.Chan {
