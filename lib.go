@@ -218,6 +218,21 @@ func (l Logger) JSON(args ...interface{}) {
 		}
 
 		os.Stdout.Write(v)
+		os.Stdout.Write([]byte(" "))
+	}
+	os.Stdout.Write([]byte("\n"))
+}
+
+func (l Logger) RawJSON(args ...interface{}) {
+	for i := 0; i < len(args); i++ {
+
+		v, err := json.Marshal(args[i])
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		os.Stdout.Write(v)
 	}
 }
 

@@ -168,6 +168,10 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 		val = reflect.ValueOf(v)
 	}
 
+	if val.Kind() == reflect.Chan {
+		return "chan"
+	}
+
 	if val.Kind() == reflect.Map {
 		return handleMap(val, size, brk, depth)
 	}
