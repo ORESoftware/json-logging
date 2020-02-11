@@ -365,5 +365,5 @@ func init() {
 		loggingTypeMap[t.Field(i).Name] = v.Field(i).Interface().(string)
 	}
 
-	fmt.Println(loggingTypeMap)
+	//fmt.Println(loggingTypeMap)
 }
