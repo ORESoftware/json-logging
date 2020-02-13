@@ -9,6 +9,8 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -190,10 +192,31 @@ func (l Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 
 	date := time.Now().UTC().String()
 	date = date[:26]
+
 	buf, err := json.Marshal([8]interface{}{"@bunion", l.AppName, level, pid, l.HostName, date, m, args})
 
 	if err != nil {
-		panic(errors.New("could not marshal the string array"))
+
+		_, file, line, _ := runtime.Caller(3)
+
+		DefaultLogger.Warn("could not marshal the slice:", err.Error(),
+			"file://" + file + ":" + strconv.Itoa(line))
+
+		cleaned := []interface{}{}
+
+		for i := 0; i < len(*args); i++{
+			val := reflect.ValueOf((*args)[i])
+			if val.Kind() != reflect.Func {
+				cleaned = append(cleaned,(*args)[i])
+			}
+		}
+
+
+		buf, err = json.Marshal([8]interface{}{"@bunion", l.AppName, level, pid, l.HostName, date, m, cleaned})
+
+		if err != nil {
+			panic(errors.New("could not marshal the slice: " + err.Error()))
+		}
 	}
 
 	os.Stdout.Write(buf)
@@ -209,7 +232,8 @@ func (l Logger) writeSwitch(level string, m *MetaFields, args *[]interface{}) {
 }
 
 func (l Logger) JSON(args ...interface{}) {
-	for i := 0; i < len(args); i++ {
+	size := len(args)
+	for i := 0; i < size; i++ {
 
 		v, err := json.Marshal(args[i])
 
@@ -218,7 +242,9 @@ func (l Logger) JSON(args ...interface{}) {
 		}
 
 		os.Stdout.Write(v)
-		os.Stdout.Write([]byte(" "))
+		if i < size - 1 {
+			os.Stdout.Write([]byte(" "))
+		}
 	}
 	os.Stdout.Write([]byte("\n"))
 }
@@ -357,6 +383,8 @@ var DefaultLogger = Logger{
 }
 
 func init() {
+
+	//log.SetFlags(log.LstdFlags | log.Llongfile)
 
 	v := reflect.ValueOf(LoggingType)
 	t := v.Type()
