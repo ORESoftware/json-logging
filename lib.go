@@ -205,10 +205,7 @@ func (l Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 		cleaned := []interface{}{}
 
 		for i := 0; i < len(*args); i++{
-			val := reflect.ValueOf((*args)[i])
-			if val.Kind() != reflect.Func {
-				cleaned = append(cleaned,(*args)[i])
-			}
+			cleaned = append(cleaned, cleanUp(*args)[i])
 		}
 
 

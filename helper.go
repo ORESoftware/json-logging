@@ -155,9 +155,6 @@ func handleStruct(val reflect.Value, size int, brk bool, depth int) string {
 	return s
 }
 
-func getStringRepFromPointer(v *interface{}, size int, brk bool, depth int) string {
-	return getStringRepresentation(*v, size, brk, depth)
-}
 
 func getStringRepresentation(v interface{}, size int, brk bool, depth int) string {
 
@@ -172,7 +169,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 	}
 
 	if val.Kind() == reflect.Chan {
-		return "chan"
+		return "(go:chan)"
 	}
 
 	if val.Kind() == reflect.Map {
@@ -295,7 +292,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 		return aurora.Yellow(v.(uint64)).String()
 	}
 
-	return " (unknown type)"
+	return " (go: unknown type)"
 
 }
 
