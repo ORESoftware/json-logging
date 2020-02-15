@@ -1,4 +1,4 @@
-package main
+package json_logging
 
 import "log"
 

@@ -1,6 +1,7 @@
 package json_logging
 
 import (
+	"log"
 	"reflect"
 	"unsafe"
 )
@@ -11,7 +12,6 @@ func cleanStruct(val reflect.Value) (z interface{}) {
 	t := val.Type()
 
 	var ret = struct {
-
 	}{}
 
 	for i := 0; i < n; i++ {
@@ -23,11 +23,9 @@ func cleanStruct(val reflect.Value) (z interface{}) {
 		rf := rs.Field(i)
 		rf = reflect.NewAt(rf.Type(), unsafe.Pointer(rf.UnsafeAddr())).Elem()
 
-
-
 		v := rf.Interface()
 
-
+		log.Println(k, v)
 	}
 
 	//log.Println("size:", size, "n:", n)
@@ -46,7 +44,7 @@ func cleanMap(m reflect.Value) (z interface{}) {
 		ret[k] = cleanUp(val)
 	}
 
-    return ret
+	return ret
 }
 
 func isNonComplexNum(kind reflect.Kind) bool {
