@@ -205,9 +205,8 @@ func (l Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 		cleaned := []interface{}{}
 
 		for i := 0; i < len(*args); i++{
-			cleaned = append(cleaned, cleanUp(*args)[i])
+			cleaned = append(cleaned, cleanUp((*args)[i]))
 		}
-
 
 		buf, err = json.Marshal([8]interface{}{"@bunion", l.AppName, level, pid, l.HostName, date, m, cleaned})
 
