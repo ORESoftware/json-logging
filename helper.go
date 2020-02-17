@@ -1,6 +1,7 @@
 package json_logging
 
 import (
+	"fmt"
 	"github.com/logrusorgru/aurora"
 	"reflect"
 	"runtime"
@@ -15,10 +16,9 @@ func addComma(i int, n int) string {
 	return ""
 }
 
-func handleMap(m reflect.Value, size int, brk bool, depth int) string {
+func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int) string {
 
 	keys := m.MapKeys()
-
 	n := len(keys)
 
 	//s := createSpaces(depth, brk) + aurora.Bold("map(").String() + createNewline(brk, true)
@@ -42,13 +42,30 @@ func handleMap(m reflect.Value, size int, brk bool, depth int) string {
 		//size = 0
 	}
 
-	s := aurora.Bold("map(").String() + createNewline(brk, true)
+	//keyType := reflect.ValueOf(keys).Type().Elem().String()
+	//valType := m.Type().Elem().String()
+	//z := fmt.Sprintf("map<%s,%s>(", keyType, valType)
+	//log.Println(z)
+
+	var h = ""
+	if n < 1 {
+		h = fmt.Sprintf("(%T", x)
+	} else{
+		h = aurora.Black("map(").String()
+	}
+
+	s := aurora.Black(h).String() + createNewline(brk, true)
 
 	for i := 0; i < n; i++ {
 		s += createSpaces(depth, brk) + values[i] + createNewline(brk, true)
 	}
 
-	return s + aurora.Bold(")").String() + createNewline(brk, true)
+	var end = ")"
+	if n > 0 {
+		end = ")"
+	}
+
+	return s + aurora.Black(end).String() + createNewline(brk, true)
 }
 
 func handleSliceAndArray(val reflect.Value, len int, brk bool, depth int) string {
@@ -163,17 +180,16 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 	if val.Kind() == reflect.Ptr {
 		//v = val.Elem().Interface()
 		//val = reflect.ValueOf(v)
-
 		val = val.Elem()
 		v = val.Interface()
 	}
 
 	if val.Kind() == reflect.Chan {
-		return "(go:chan)"
+		return fmt.Sprintf("(chan %s)", val.Type().Elem().String())
 	}
 
 	if val.Kind() == reflect.Map {
-		return handleMap(val, size, brk, depth)
+		return handleMap(v, val, size, brk, depth)
 	}
 
 	if val.Kind() == reflect.Slice {

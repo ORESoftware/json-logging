@@ -1,6 +1,9 @@
 package main
 
-import . "github.com/oresoftware/json-logging/test/logging"
+import (
+	. "github.com/oresoftware/json-logging/test/logging"
+	"os"
+)
 
 type Zoom struct {
 	Bagel bool
@@ -21,19 +24,21 @@ func main() {
 	//Log.Info(" ag ageg a gae")
 	//
 
-	Log.JSON("foo", true, 44.44)
+	//Log.JSON("foo", true, 44.44, make(chan int))
 
 	//Log.Info("foo", 55, main, true, struct{ Boo string }{"fudge"}, map[string]interface{}{"fpp": "age", "boop": struct{
 	//	Bop string
 	//	dog int
 	//}{"age", 5}})
 
-	Log.Info("'foo'", 55, main, true, struct{ Boo string }{"fudge"}, map[string]interface{}{"fpp": "age", "boop": struct{
+	Log.Info("'foo'", 55, main, true, struct{ Boo string }{"fudge"}, map[int]int{}, map[string]interface{}{"fpp": "age", "boop": struct{
 		Bop string
 		dog int
-	}{"age", 5}})
+		c chan int
+	}{"age", 5, make(chan int)}})
 
-	//
+	os.Exit(3);
+
 	//Log.Info(map[string]interface{}{"foo": 5}, "bar", struct {
 	//	Foo  string `json:"foo"`
 	//	Butt Zoom   `json:"buff"`

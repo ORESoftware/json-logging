@@ -57,15 +57,17 @@ func New(AppName string, forceJSON bool, hostName string) *Logger {
 
 	if hostName == "" {
 
-		hn, err := os.Hostname()
+		hostName = os.Getenv("HOSTNAME")
 
-		if err != nil {
-			DefaultLogger.Warn("Could not grab hostname from env.")
-			hostName = "unknown_hostname"
-		} else {
-			hostName = hn
+		if hostName == "" {
+			hn, err := os.Hostname()
+			if err != nil {
+				DefaultLogger.Warn("Could not grab hostname from env.")
+				hostName = "unknown_hostname"
+			} else {
+				hostName = hn
+			}
 		}
-
 	}
 
 	return &Logger{
@@ -375,7 +377,8 @@ func (l Logger) Stderr(args ...interface{}) {
 var DefaultLogger = Logger{
 	AppName:       "Default",
 	IsLoggingJSON: !isTerminal,
-	HostName:      "",
+	HostName:      os.Getenv("HOSTNAME"),
+
 }
 
 func init() {
