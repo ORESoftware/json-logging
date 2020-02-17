@@ -50,7 +50,7 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int) st
 	var h = ""
 	if n < 1 {
 		h = fmt.Sprintf("(%T", x)
-	} else{
+	} else {
 		h = aurora.Black("map(").String()
 	}
 
@@ -171,7 +171,6 @@ func handleStruct(val reflect.Value, size int, brk bool, depth int) string {
 
 	return s
 }
-
 
 func getStringRepresentation(v interface{}, size int, brk bool, depth int) string {
 

@@ -11,13 +11,11 @@ type Zoom struct {
 	Val   int
 }
 
-func (z Zoom) Zoom() string{
-   return "bop"
+func (z Zoom) Zoom() string {
+	return "bop"
 }
 
-
 func main() {
-
 
 	//Log.Warn([3]interface{}{"foo","bar", struct{foo string}{"fu"}})
 	//
@@ -31,13 +29,13 @@ func main() {
 	//	dog int
 	//}{"age", 5}})
 
-	Log.Info("'foo'", 55, main, true, struct{ Boo string }{"fudge"}, map[int]int{}, map[string]interface{}{"fpp": "age", "boop": struct{
+	Log.Info("'foo'", 55, main, true, struct{ Boo string }{"fudge"}, map[int]int{}, map[string]interface{}{"fpp": "age", "boop": struct {
 		Bop string
 		dog int
-		c chan int
+		c   chan int
 	}{"age", 5, make(chan int)}})
 
-	os.Exit(3);
+	os.Exit(3)
 
 	//Log.Info(map[string]interface{}{"foo": 5}, "bar", struct {
 	//	Foo  string `json:"foo"`
@@ -46,7 +44,6 @@ func main() {
 	//	Bagel: true,
 	//},
 	//})
-
 
 	//Log.Info(Zoom{})
 

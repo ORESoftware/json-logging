@@ -202,11 +202,11 @@ func (l Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 		_, file, line, _ := runtime.Caller(3)
 
 		DefaultLogger.Warn("could not marshal the slice:", err.Error(),
-			"file://" + file + ":" + strconv.Itoa(line))
+			"file://"+file+":"+strconv.Itoa(line))
 
 		cleaned := []interface{}{}
 
-		for i := 0; i < len(*args); i++{
+		for i := 0; i < len(*args); i++ {
 			cleaned = append(cleaned, cleanUp((*args)[i]))
 		}
 
@@ -240,7 +240,7 @@ func (l Logger) JSON(args ...interface{}) {
 		}
 
 		os.Stdout.Write(v)
-		if i < size - 1 {
+		if i < size-1 {
 			os.Stdout.Write([]byte(" "))
 		}
 	}
@@ -378,7 +378,6 @@ var DefaultLogger = Logger{
 	AppName:       "Default",
 	IsLoggingJSON: !isTerminal,
 	HostName:      os.Getenv("HOSTNAME"),
-
 }
 
 func init() {
