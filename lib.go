@@ -204,7 +204,9 @@ func (l Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 		DefaultLogger.Warn("could not marshal the slice:", err.Error(),
 			"file://"+file+":"+strconv.Itoa(line))
 
-		cleaned := []interface{}{}
+		//cleaned := make([]interface{},0)
+
+		var cleaned = make([]interface{},0)
 
 		for i := 0; i < len(*args); i++ {
 			cleaned = append(cleaned, cleanUp((*args)[i]))
