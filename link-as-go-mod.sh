@@ -77,7 +77,10 @@ for go_proj_path in $(find_dirs); do
     rm -rf "$tmp_proj_path"
 
     mv "$go_proj_path" "$tmp_proj_path"
-    rsync -r --exclude='.git' --exclude='.idea' "$local_proj_path" "$go_proj_path"
+
+    mkdir -p  "$go_proj_path"
+
+    rsync -r --exclude='.git' --exclude='.idea' "$local_proj_path/" "$go_proj_path/"
 #    ln -s "$local_proj_path" "$go_proj_path"
 
 done;
