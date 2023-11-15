@@ -190,6 +190,22 @@ func (l Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 	os.Stdout.Write([]byte("\n"))
 }
 
+func (l Logger) writeJSONFromSingleString(level string, m *MetaFields, s string) {
+
+	date := time.Now().UTC().String()
+	date = date[:26]
+
+	buf, err := json.Marshal([8]interface{}{"@bunion", l.AppName, level, pid, l.HostName, date, m, s})
+
+	if err != nil {
+		DefaultLogger.Warn(err)
+	} else {
+		os.Stdout.Write(buf)
+		os.Stdout.Write([]byte("\n"))
+	}
+
+}
+
 func (l Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 
 	date := time.Now().UTC().String()
@@ -206,7 +222,7 @@ func (l Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 
 		//cleaned := make([]interface{},0)
 
-		var cleaned = make([]interface{},0)
+		var cleaned = make([]interface{}, 0)
 
 		for i := 0; i < len(*args); i++ {
 			cleaned = append(cleaned, cleanUp((*args)[i]))
@@ -221,6 +237,14 @@ func (l Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 
 	os.Stdout.Write(buf)
 	os.Stdout.Write([]byte("\n"))
+}
+
+func (l Logger) writeSwitchSingleString(level string, m *MetaFields, s string) {
+	if l.IsLoggingJSON {
+		l.writeJSONFromSingleString(level, m, s)
+	} else {
+		l.writePretty(level, m, &[]interface{}{s})
+	}
 }
 
 func (l Logger) writeSwitch(level string, m *MetaFields, args *[]interface{}) {
@@ -346,6 +370,30 @@ func (l Logger) Debugx(m MetaFields, args ...interface{}) {
 
 func (l Logger) Tracex(m MetaFields, args ...interface{}) {
 	l.writeSwitch("TRACE", &m, &args)
+}
+
+func (l Logger) Infof(s string, args ...interface{}) {
+	l.writeSwitchSingleString("INFO", nil, fmt.Sprintf(s, args...))
+}
+
+func (l Logger) Warnf(s string, args ...interface{}) {
+	l.writeSwitchSingleString("WARN", nil, fmt.Sprintf(s, args...))
+}
+
+func (l Logger) Errorf(s string, args ...interface{}) {
+	l.writeSwitchSingleString("ERROR", nil, fmt.Sprintf(s, args...))
+}
+
+func (l Logger) Fatalf(s string, args ...interface{}) {
+	l.writeSwitchSingleString("FATAL", nil, fmt.Sprintf(s, args...))
+}
+
+func (l Logger) Debugf(s string, args ...interface{}) {
+	l.writeSwitchSingleString("DEBUG", nil, fmt.Sprintf(s, args...))
+}
+
+func (l Logger) Tracef(s string, args ...interface{}) {
+	l.writeSwitchSingleString("TRACE", nil, fmt.Sprintf(s, args...))
 }
 
 func (l Logger) NewLine() {
