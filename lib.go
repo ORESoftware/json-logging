@@ -295,6 +295,10 @@ func (l Logger) Warn(args ...interface{}) {
 	l.writeSwitch("WARN", nil, &args)
 }
 
+func (l Logger) Warning(args ...interface{}) {
+	l.writeSwitch("WARN", nil, &args)
+}
+
 func (l Logger) Error(args ...interface{}) {
 	l.writeSwitch("ERROR", nil, &args)
 }
@@ -358,6 +362,10 @@ func (l Logger) Warnx(m MetaFields, args ...interface{}) {
 	l.writeSwitch("WARN", &m, &args)
 }
 
+func (l Logger) Warningx(m MetaFields, args ...interface{}) {
+	l.writeSwitch("WARN", &m, &args)
+}
+
 func (l Logger) Errorx(m MetaFields, args ...interface{}) {
 	l.writeSwitch("ERROR", &m, &args)
 }
@@ -380,6 +388,10 @@ func (l Logger) Infof(s string, args ...interface{}) {
 }
 
 func (l Logger) Warnf(s string, args ...interface{}) {
+	l.writeSwitchSingleString("WARN", nil, fmt.Sprintf(s, args...))
+}
+
+func (l Logger) Warningf(s string, args ...interface{}) {
 	l.writeSwitchSingleString("WARN", nil, fmt.Sprintf(s, args...))
 }
 
