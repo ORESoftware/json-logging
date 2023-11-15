@@ -274,6 +274,7 @@ func (l Logger) JSON(args ...interface{}) {
 }
 
 func (l Logger) RawJSON(args ...interface{}) {
+	// raw = no newlines, no spaces
 	for i := 0; i < len(args); i++ {
 
 		v, err := json.Marshal(args[i])
@@ -300,6 +301,7 @@ func (l Logger) Error(args ...interface{}) {
 
 func (l Logger) Fatal(args ...interface{}) {
 	l.writeSwitch("FATAL", nil, &args)
+	os.Exit(1)
 }
 
 func (l Logger) Debug(args ...interface{}) {
@@ -362,6 +364,7 @@ func (l Logger) Errorx(m MetaFields, args ...interface{}) {
 
 func (l Logger) Fatalx(m MetaFields, args ...interface{}) {
 	l.writeSwitch("FATAL", &m, &args)
+	os.Exit(1)
 }
 
 func (l Logger) Debugx(m MetaFields, args ...interface{}) {
@@ -386,6 +389,7 @@ func (l Logger) Errorf(s string, args ...interface{}) {
 
 func (l Logger) Fatalf(s string, args ...interface{}) {
 	l.writeSwitchSingleString("FATAL", nil, fmt.Sprintf(s, args...))
+	os.Exit(1)
 }
 
 func (l Logger) Debugf(s string, args ...interface{}) {
