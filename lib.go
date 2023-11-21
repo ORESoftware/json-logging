@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -300,7 +301,17 @@ func (l Logger) Warning(args ...interface{}) {
 }
 
 func (l Logger) Error(args ...interface{}) {
+	if l.IsLoggingJSON {
+		stackBuf := make([]byte, 1024)
+		length := runtime.Stack(stackBuf, false)
+		stackTrace := string(stackBuf[:length])
+		args = append(args, stackTrace)
+	}
 	l.writeSwitch("ERROR", nil, &args)
+	if !l.IsLoggingJSON {
+		debug.PrintStack()
+	}
+
 }
 
 func (l Logger) Fatal(args ...interface{}) {
@@ -396,7 +407,16 @@ func (l Logger) Warningf(s string, args ...interface{}) {
 }
 
 func (l Logger) Errorf(s string, args ...interface{}) {
+	if l.IsLoggingJSON {
+		stackBuf := make([]byte, 1024)
+		length := runtime.Stack(stackBuf, false)
+		stackTrace := string(stackBuf[:length])
+		args = append(args, stackTrace)
+	}
 	l.writeSwitchSingleString("ERROR", nil, fmt.Sprintf(s, args...))
+	if !l.IsLoggingJSON {
+		debug.PrintStack()
+	}
 }
 
 func (l Logger) Fatalf(s string, args ...interface{}) {

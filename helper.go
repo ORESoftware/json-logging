@@ -1,6 +1,7 @@
 package json_logging
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	"reflect"
@@ -16,7 +17,7 @@ func addComma(i int, n int) string {
 	return ""
 }
 
-func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int) string {
+func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, cache *map[*interface{}]string) string {
 
 	keys := m.MapKeys()
 	n := len(keys)
@@ -28,9 +29,9 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int) st
 	for i, k := range keys {
 		val := m.MapIndex(k)
 
-		z := getStringRepresentation(k.Interface(), size, brk, depth+1) +
+		z := getStringRepresentation(k.Interface(), size, brk, depth+1, cache) +
 			" => " +
-			getStringRepresentation(val.Interface(), size, brk, depth+1) +
+			getStringRepresentation(val.Interface(), size, brk, depth+1, cache) +
 			addComma(i, n)
 
 		size = size + len(z)
@@ -68,14 +69,14 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int) st
 	return s + aurora.Black(end).String() + createNewline(brk, true)
 }
 
-func handleSliceAndArray(val reflect.Value, len int, brk bool, depth int) string {
+func handleSliceAndArray(val reflect.Value, len int, brk bool, depth int, cache *map[*interface{}]string) string {
 
 	s := createSpaces(depth, brk) + aurora.Bold("[").String()
 
 	n := val.Len()
 	for i := 0; i < n; i++ {
 		s += createSpaces(depth, brk) +
-			getStringRepresentation(val.Index(i).Interface(), len, brk, depth) +
+			getStringRepresentation(val.Index(i).Interface(), len, brk, depth, cache) +
 			addComma(i, n)
 	}
 
@@ -102,7 +103,7 @@ func createSpaces(n int, brk bool) string {
 	return v
 }
 
-func handleStruct(val reflect.Value, size int, brk bool, depth int) string {
+func handleStruct(val reflect.Value, size int, brk bool, depth int, cache *map[*interface{}]string) string {
 
 	n := val.NumField()
 	t := val.Type()
@@ -144,8 +145,13 @@ func handleStruct(val reflect.Value, size int, brk bool, depth int) string {
 
 		v := rf.Interface()
 
+		if (*cache)[&v] != "" {
+			return (*cache)[&v]
+		}
+
 		//v := fv.Interface()
-		z := getStringRepresentation(v, size, brk, depth+1)
+		z := getStringRepresentation(v, size, brk, depth+1, cache)
+		(*cache)[&v] = z
 
 		values = append(values, z)
 		size = size + len(z)
@@ -172,7 +178,21 @@ func handleStruct(val reflect.Value, size int, brk bool, depth int) string {
 	return s
 }
 
-func getStringRepresentation(v interface{}, size int, brk bool, depth int) string {
+type Stringer interface {
+	String() string
+}
+
+type ToString interface {
+	ToString() string
+}
+
+func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) (s string) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			s = fmt.Sprintf("(go: unknown type: '%+v')", v)
+		}
+	}()
 
 	val := reflect.ValueOf(v)
 
@@ -180,7 +200,9 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 		//v = val.Elem().Interface()
 		//val = reflect.ValueOf(v)
 		val = val.Elem()
-		v = val.Interface()
+		if val.IsValid() { // Check if the dereferenced value is valid
+			v = val.Interface()
+		}
 	}
 
 	if val.Kind() == reflect.Chan {
@@ -188,15 +210,15 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 	}
 
 	if val.Kind() == reflect.Map {
-		return handleMap(v, val, size, brk, depth)
+		return handleMap(v, val, size, brk, depth, cache)
 	}
 
 	if val.Kind() == reflect.Slice {
-		return handleSliceAndArray(val, size, brk, depth)
+		return handleSliceAndArray(val, size, brk, depth, cache)
 	}
 
 	if val.Kind() == reflect.Array {
-		return handleSliceAndArray(val, size, brk, depth)
+		return handleSliceAndArray(val, size, brk, depth, cache)
 	}
 	//
 	//if val.Kind() == reflect.Ptr {
@@ -208,11 +230,15 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 	}
 
 	if val.Kind() == reflect.Struct {
-		return handleStruct(val, size, brk, depth)
+		if (*cache)[&v] != "" {
+			return (*cache)[&v]
+		}
+		(*cache)[&v] = handleStruct(val, size, brk, depth, cache)
+		return (*cache)[&v]
 	}
 
 	if val.Kind() == reflect.String {
-		return "'" + aurora.Green(v.(string)).String() + "'"
+		return "'" + aurora.Green(v).String() + "'"
 	}
 
 	if _, ok := v.(string); ok {
@@ -228,7 +254,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 	}
 
 	if val.Kind() == reflect.Int {
-		return aurora.Yellow(strconv.Itoa(v.(int))).String()
+		return aurora.Yellow(v).String()
 	}
 
 	if _, ok := v.(int); ok {
@@ -236,7 +262,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 	}
 
 	if val.Kind() == reflect.Int8 {
-		return aurora.Yellow(v.(int8)).String()
+		return aurora.Yellow(v).String()
 	}
 
 	if _, ok := v.(int8); ok {
@@ -244,7 +270,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 	}
 
 	if val.Kind() == reflect.Int16 {
-		return aurora.Yellow(v.(int16)).String()
+		return aurora.Yellow(v).String()
 	}
 
 	if _, ok := v.(int16); ok {
@@ -252,7 +278,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 	}
 
 	if val.Kind() == reflect.Int32 {
-		return aurora.Yellow(v.(int32)).String()
+		return aurora.Yellow(v).String()
 	}
 
 	if _, ok := v.(int32); ok {
@@ -260,7 +286,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 	}
 
 	if val.Kind() == reflect.Int64 {
-		return aurora.Yellow(strconv.FormatInt(v.(int64), 1)).String()
+		return aurora.Yellow(v).String()
 	}
 
 	if _, ok := v.(int64); ok {
@@ -268,7 +294,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 	}
 
 	if val.Kind() == reflect.Uint {
-		return aurora.Yellow(v.(uint)).String()
+		return aurora.Yellow(v).String()
 	}
 
 	if _, ok := v.(uint); ok {
@@ -276,15 +302,15 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 	}
 
 	if val.Kind() == reflect.Uint8 {
-		return aurora.Yellow(v.(uint8)).String()
+		return aurora.Yellow(v).String()
 	}
 
 	if _, ok := v.(uint8); ok {
-		return aurora.Yellow(v.(uint8)).String()
+		return aurora.Yellow(v).String()
 	}
 
 	if val.Kind() == reflect.Uint16 {
-		return aurora.Yellow(v.(uint16)).String()
+		return aurora.Yellow(v).String()
 	}
 
 	if _, ok := v.(uint16); ok {
@@ -292,7 +318,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 	}
 
 	if val.Kind() == reflect.Uint32 {
-		return aurora.Yellow(v.(uint32)).String()
+		return aurora.Yellow(v).String()
 	}
 
 	if _, ok := v.(uint32); ok {
@@ -300,17 +326,34 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int) strin
 	}
 
 	if val.Kind() == reflect.Uint64 {
-		return aurora.Yellow(v.(uint64)).String()
+		return aurora.Yellow(v).String()
 	}
 
 	if _, ok := v.(uint64); ok {
 		return aurora.Yellow(v.(uint64)).String()
 	}
 
-	return " (go: unknown type)"
+	if z, ok := v.(Stringer); ok && z != nil && &z != nil {
+		return z.String()
+	}
+
+	if z, ok := v.(ToString); ok && z != nil && &z != nil {
+		return z.ToString()
+	}
+
+	if z, ok := v.(error); ok && z != nil && &z != nil {
+		return z.Error()
+	}
+
+	if z, err := json.Marshal(v); err == nil {
+		return fmt.Sprintf("(go: unknown type: '%+v', as JSON: '%s')", v, z)
+	}
+
+	return fmt.Sprintf("(go: unknown type: '%+v')", v)
 
 }
 
 func getPrettyString(v interface{}, size int) string {
-	return getStringRepresentation(v, size, false, 2)
+	var cache = make(map[*interface{}]string)
+	return getStringRepresentation(v, size, false, 2, (&cache))
 }

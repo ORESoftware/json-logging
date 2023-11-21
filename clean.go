@@ -64,7 +64,11 @@ func cleanUp(v interface{}) (z interface{}) {
 	val := reflect.ValueOf(v)
 	kind := val.Kind()
 
-	if kind == reflect.Bool || kind == reflect.String {
+	if kind == reflect.Bool {
+		return v
+	}
+
+	if kind == reflect.String {
 		return v
 	}
 
