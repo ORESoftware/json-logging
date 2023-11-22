@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	"golang.org/x/crypto/ssh/terminal"
-	"log"
 	"os"
 	"reflect"
 	"runtime"
@@ -263,7 +262,7 @@ func (l Logger) JSON(args ...interface{}) {
 		v, err := json.Marshal(args[i])
 
 		if err != nil {
-			log.Fatal(err)
+			panic(err)
 		}
 
 		os.Stdout.Write(v)
@@ -281,7 +280,7 @@ func (l Logger) RawJSON(args ...interface{}) {
 		v, err := json.Marshal(args[i])
 
 		if err != nil {
-			log.Fatal(err)
+			panic(err)
 		}
 
 		os.Stdout.Write(v)
@@ -312,11 +311,6 @@ func (l Logger) Error(args ...interface{}) {
 		debug.PrintStack()
 	}
 
-}
-
-func (l Logger) Fatal(args ...interface{}) {
-	l.writeSwitch("FATAL", nil, &args)
-	os.Exit(1)
 }
 
 func (l Logger) Debug(args ...interface{}) {
@@ -381,11 +375,6 @@ func (l Logger) Errorx(m MetaFields, args ...interface{}) {
 	l.writeSwitch("ERROR", &m, &args)
 }
 
-func (l Logger) Fatalx(m MetaFields, args ...interface{}) {
-	l.writeSwitch("FATAL", &m, &args)
-	os.Exit(1)
-}
-
 func (l Logger) Debugx(m MetaFields, args ...interface{}) {
 	l.writeSwitch("DEBUG", &m, &args)
 }
@@ -417,11 +406,6 @@ func (l Logger) Errorf(s string, args ...interface{}) {
 	if !l.IsLoggingJSON {
 		debug.PrintStack()
 	}
-}
-
-func (l Logger) Fatalf(s string, args ...interface{}) {
-	l.writeSwitchSingleString("FATAL", nil, fmt.Sprintf(s, args...))
-	os.Exit(1)
 }
 
 func (l Logger) Debugf(s string, args ...interface{}) {
