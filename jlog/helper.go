@@ -186,6 +186,13 @@ type ToString interface {
 	ToString() string
 }
 
+// TODO: use StringBuilder
+//var sb strings.Builder
+//sb.WriteString("Hello, ")
+//sb.WriteString(" years old.")
+//greeting := sb.String()
+// write direct to stdout using: sb.WriteTo(os.Stdout)
+
 func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) (s string) {
 
 	defer func() {
@@ -244,6 +251,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 
 	if kind == reflect.Struct {
 		if (*cache)[&v] != "" {
+			// TODO: verify the caching logic
 			return (*cache)[&v]
 		}
 		(*cache)[&v] = handleStruct(val, size, brk, depth, cache)

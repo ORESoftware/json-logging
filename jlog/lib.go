@@ -28,7 +28,7 @@ type Logger struct {
 	ForceJSON     bool
 	ForceNonJSON  bool
 	TimeZone      string
-	MetaFields    *metaFields
+	MetaFields    *MetaFields
 }
 
 type LoggerParams struct {
@@ -37,7 +37,7 @@ type LoggerParams struct {
 	HostName      string
 	ForceJSON     bool
 	ForceNonJSON  bool
-	MetaFields    metaFields
+	MetaFields    MetaFields
 	TimeZone      string
 }
 
@@ -96,9 +96,8 @@ type KV struct {
 	*marker
 }
 
-type M = []KV
-
-var kv = M{{},{}}
+type M = map[string]interface{}
+type L = []KV
 
 func doCopyAndDerefStruct(s interface{}) interface{} {
 	val := reflect.ValueOf(s).Elem()
@@ -142,8 +141,8 @@ func copyAndDereference(s interface{}) interface{} {
 
 }
 
-func NewMetaFields(m *map[string]interface{}) *metaFields {
-	return &metaFields{
+func NewMetaFields(m *map[string]interface{}) *MetaFields {
+	return &MetaFields{
 		marker:       mark,
 		UniqueMarker: "UniqueMarker(Brand)",
 		m:            m,
@@ -184,7 +183,7 @@ func (l *Logger) Create(m *map[string]interface{}) *Logger {
 	}
 }
 
-func (l *Logger) writePretty(level string, m *metaFields, args *[]interface{}) {
+func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 
 	date := time.Now().UTC().String()[11:25] // only first 25 chars
 
@@ -248,7 +247,7 @@ func (l *Logger) writePretty(level string, m *metaFields, args *[]interface{}) {
 	}
 }
 
-func (l *Logger) writeJSONFromFormattedStr(level string, m *metaFields, s *[]interface{}) {
+func (l *Logger) writeJSONFromFormattedStr(level string, m *MetaFields, s *[]interface{}) {
 
 	date := time.Now().UTC().String()
 	date = date[:26]
@@ -264,7 +263,7 @@ func (l *Logger) writeJSONFromFormattedStr(level string, m *metaFields, s *[]int
 
 }
 
-func (l *Logger) writeJSON(level string, m *metaFields, args *[]interface{}) {
+func (l *Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 
 	date := time.Now().UTC().String()
 	date = date[:26]
@@ -297,7 +296,7 @@ func (l *Logger) writeJSON(level string, m *metaFields, args *[]interface{}) {
 	os.Stdout.Write([]byte("\n"))
 }
 
-func (l *Logger) writeSwitchForFormattedString(level string, m *metaFields, s *[]interface{}) {
+func (l *Logger) writeSwitchForFormattedString(level string, m *MetaFields, s *[]interface{}) {
 	if l.IsLoggingJSON {
 		l.writeJSONFromFormattedStr(level, m, s)
 	} else {
@@ -305,7 +304,7 @@ func (l *Logger) writeSwitchForFormattedString(level string, m *metaFields, s *[
 	}
 }
 
-func (l *Logger) writeSwitch(level string, m *metaFields, args *[]interface{}) {
+func (l *Logger) writeSwitch(level string, m *MetaFields, args *[]interface{}) {
 	if l.IsLoggingJSON {
 		l.writeJSON(level, m, args)
 	} else {
@@ -376,7 +375,7 @@ type marker struct{}
 
 var mark = &marker{}
 
-type metaFields struct {
+type MetaFields struct {
 	*marker
 	UniqueMarker string
 	m            *map[string]interface{}
@@ -384,13 +383,13 @@ type metaFields struct {
 
 func MetaPairs(
 	k1 string, v1 interface{},
-	args ...interface{}) *metaFields {
+	args ...interface{}) *MetaFields {
 	return MP(k1, v1, args...)
 }
 
 func MP(
 	k1 string, v1 interface{},
-	args ...interface{}) *metaFields {
+	args ...interface{}) *MetaFields {
 
 	m := make(map[string]interface{})
 	nargs := append([]interface{}{k1, v1}, args...) // prepend the first two arguments to new slice
@@ -443,17 +442,12 @@ func getFilteredStacktrace() string {
 }
 
 func (l *Logger) TagPair(k string, v interface{}) *Logger {
-
-	return &l.Create(NewMetaFields(
-		   *map[string]interface{}{
-			   k, v
-		   }
-		))
+	var z = map[string]interface{}{k: v}
+	return l.Child(&z)
 }
 
-func (l *Logger) Tags() *Logger {
-
-	return &l.Create()
+func (l *Logger) Tags(z *map[string]interface{}) *Logger {
+	return l.Create(z)
 }
 
 func (l *Logger) InfoF(s string, args ...interface{}) {
