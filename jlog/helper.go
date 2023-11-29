@@ -166,7 +166,7 @@ func handleStruct(val reflect.Value, size int, brk bool, depth int, cache *map[*
 		brk = true
 	}
 
-	s := "{" + createNewline(brk, n > 0)
+	s := t.Name() + " {" + createNewline(brk, n > 3)
 
 	for i := 0; i < n; i++ {
 		s += createSpaces(depth, brk) + keys[i]
@@ -194,9 +194,18 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		}
 	}()
 
-	val := reflect.ValueOf(v)
+	//if &v == nil {
+	//	return "<nil>"
+	//}
+	//
+	//if v == nil {
+	//	return "<nil>"
+	//}
 
-	if val.Kind() == reflect.Ptr {
+	val := reflect.ValueOf(v)
+	var kind = val.Kind()
+
+	if kind == reflect.Ptr {
 		//v = val.Elem().Interface()
 		//val = reflect.ValueOf(v)
 		val = val.Elem()
@@ -205,31 +214,35 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		}
 	}
 
-	if val.Kind() == reflect.Chan {
+	if v == nil {
+		return "<nil>"
+	}
+
+	if kind == reflect.Chan {
 		return fmt.Sprintf("(chan %s)", val.Type().Elem().String())
 	}
 
-	if val.Kind() == reflect.Map {
+	if kind == reflect.Map {
 		return handleMap(v, val, size, brk, depth, cache)
 	}
 
-	if val.Kind() == reflect.Slice {
+	if kind == reflect.Slice {
 		return handleSliceAndArray(val, size, brk, depth, cache)
 	}
 
-	if val.Kind() == reflect.Array {
+	if kind == reflect.Array {
 		return handleSliceAndArray(val, size, brk, depth, cache)
 	}
 	//
-	//if val.Kind() == reflect.Ptr {
+	//if kind == reflect.Ptr {
 	//	return getStringRepFromPointer(&v, size, brk, depth)
 	//}
 
-	if val.Kind() == reflect.Func {
+	if kind == reflect.Func {
 		return "(" + runtime.FuncForPC(val.Pointer()).Name() + "(func))"
 	}
 
-	if val.Kind() == reflect.Struct {
+	if kind == reflect.Struct {
 		if (*cache)[&v] != "" {
 			return (*cache)[&v]
 		}
@@ -237,7 +250,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		return (*cache)[&v]
 	}
 
-	if val.Kind() == reflect.String {
+	if kind == reflect.String {
 		return "'" + aurora.Green(v).String() + "'"
 	}
 
@@ -245,7 +258,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		return "'" + aurora.Green(v.(string)).String() + "'"
 	}
 
-	if val.Kind() == reflect.Bool {
+	if kind == reflect.Bool {
 		return aurora.BrightBlue(strconv.FormatBool(v.(bool))).String()
 	}
 
@@ -253,7 +266,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		return aurora.BrightBlue(strconv.FormatBool(v.(bool))).String()
 	}
 
-	if val.Kind() == reflect.Int {
+	if kind == reflect.Int {
 		return aurora.Yellow(v).String()
 	}
 
@@ -261,7 +274,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		return aurora.Yellow(strconv.Itoa(v.(int))).String()
 	}
 
-	if val.Kind() == reflect.Int8 {
+	if kind == reflect.Int8 {
 		return aurora.Yellow(v).String()
 	}
 
@@ -269,7 +282,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		return aurora.Yellow(v.(int8)).String()
 	}
 
-	if val.Kind() == reflect.Int16 {
+	if kind == reflect.Int16 {
 		return aurora.Yellow(v).String()
 	}
 
@@ -277,7 +290,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		return aurora.Yellow(v.(int16)).String()
 	}
 
-	if val.Kind() == reflect.Int32 {
+	if kind == reflect.Int32 {
 		return aurora.Yellow(v).String()
 	}
 
@@ -285,7 +298,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		return aurora.Yellow(v.(int32)).String()
 	}
 
-	if val.Kind() == reflect.Int64 {
+	if kind == reflect.Int64 {
 		return aurora.Yellow(v).String()
 	}
 
@@ -293,7 +306,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		return aurora.Yellow(strconv.FormatInt(v.(int64), 1)).String()
 	}
 
-	if val.Kind() == reflect.Uint {
+	if kind == reflect.Uint {
 		return aurora.Yellow(v).String()
 	}
 
@@ -301,7 +314,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		return aurora.Yellow(v.(uint)).String()
 	}
 
-	if val.Kind() == reflect.Uint8 {
+	if kind == reflect.Uint8 {
 		return aurora.Yellow(v).String()
 	}
 
@@ -309,7 +322,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		return aurora.Yellow(v).String()
 	}
 
-	if val.Kind() == reflect.Uint16 {
+	if kind == reflect.Uint16 {
 		return aurora.Yellow(v).String()
 	}
 
@@ -317,7 +330,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		return aurora.Yellow(v.(uint16)).String()
 	}
 
-	if val.Kind() == reflect.Uint32 {
+	if kind == reflect.Uint32 {
 		return aurora.Yellow(v).String()
 	}
 
@@ -325,7 +338,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		return aurora.Yellow(v.(uint32)).String()
 	}
 
-	if val.Kind() == reflect.Uint64 {
+	if kind == reflect.Uint64 {
 		return aurora.Yellow(v).String()
 	}
 
