@@ -227,7 +227,28 @@ func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 	}
 
 	size := 0
+
+	var primitive = true
+
 	for _, v := range *args {
+
+		val := reflect.ValueOf(v)
+		var kind = reflect.TypeOf(v).Kind()
+
+		if kind == reflect.Ptr {
+			//v = val.Elem().Interface()
+			//val = reflect.ValueOf(v)
+			val = val.Elem()
+			if val.IsValid() { // Check if the dereferenced value is valid
+				v = val.Interface()
+				val = reflect.ValueOf(v)
+				kind = val.Kind()
+			}
+		}
+
+		if isNonPrimitive() {
+			primitive = false
+		}
 
 		s := getPrettyString(v, size) + " "
 		i := strings.LastIndex(s, "\n")
@@ -240,11 +261,40 @@ func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 		if _, err := safeStdout.Write([]byte(s)); err != nil {
 			fmt.Println(err)
 		}
+
+		if !primitive {
+
+			zz := fmt.Sprintf("sprintf: %+v", v)
+			if _, err := safeStdout.Write([]byte(zz)); err != nil {
+				fmt.Println(err)
+			}
+
+			safeStdout.Write([]byte("json:"))
+			if x, err := json.Marshal(v); err == nil {
+				if _, err := safeStdout.Write([]byte(x)); err != nil {
+					fmt.Println("err1:", err)
+				}
+			} else {
+				fmt.Println("err2:", err)
+			}
+
+		}
+
 	}
 
 	if _, err := safeStdout.Write([]byte("\n")); err != nil {
 		fmt.Println(err)
 	}
+}
+
+func isNonPrimitive(kind reflect.Kind) bool {
+	return kind == reflect.Slice ||
+		kind == reflect.Array ||
+		kind == reflect.Struct ||
+		kind == reflect.Func ||
+		kind == reflect.Map ||
+		kind == reflect.Chan ||
+		kind == reflect.Interface
 }
 
 func (l *Logger) writeJSONFromFormattedStr(level string, m *MetaFields, s *[]interface{}) {
@@ -300,7 +350,7 @@ func (l *Logger) writeSwitchForFormattedString(level string, m *MetaFields, s *[
 	if l.IsLoggingJSON {
 		l.writeJSONFromFormattedStr(level, m, s)
 	} else {
-		l.writePretty(level, m, &[]interface{}{s})
+		l.writePretty(level, m, s)
 	}
 }
 

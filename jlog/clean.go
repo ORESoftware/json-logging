@@ -1,6 +1,7 @@
 package json_logging
 
 import (
+	"fmt"
 	"log"
 	"reflect"
 	"unsafe"
@@ -81,7 +82,7 @@ func cleanUp(v interface{}) (z interface{}) {
 	}
 
 	if kind == reflect.Complex64 {
-		return "(go:complex64)" // v.(complex64)
+		return fmt.Sprintf("(go:complex64:%+v)", v) // v.(complex64)
 	}
 
 	if kind == reflect.Complex128 {
@@ -89,7 +90,7 @@ func cleanUp(v interface{}) (z interface{}) {
 	}
 
 	if kind == reflect.Chan {
-		return "(go:chan)"
+		return fmt.Sprintf("(go:chan:%+v)", v)
 	}
 
 	if kind == reflect.UnsafePointer {

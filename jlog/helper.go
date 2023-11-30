@@ -201,13 +201,13 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		}
 	}()
 
-	//if &v == nil {
-	//	return "<nil>"
-	//}
-	//
-	//if v == nil {
-	//	return "<nil>"
-	//}
+	if &v == nil {
+		return "<nil>"
+	}
+
+	if v == nil {
+		return "<nil>"
+	}
 
 	val := reflect.ValueOf(v)
 	var kind = val.Kind()
@@ -218,6 +218,13 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 		val = val.Elem()
 		if val.IsValid() { // Check if the dereferenced value is valid
 			v = val.Interface()
+
+			if v == nil {
+				return "<nil>"
+			}
+
+			val = reflect.ValueOf(v)
+			kind = val.Kind()
 		}
 	}
 
@@ -240,10 +247,6 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 	if kind == reflect.Array {
 		return handleSliceAndArray(val, size, brk, depth, cache)
 	}
-	//
-	//if kind == reflect.Ptr {
-	//	return getStringRepFromPointer(&v, size, brk, depth)
-	//}
 
 	if kind == reflect.Func {
 		return "(" + runtime.FuncForPC(val.Pointer()).Name() + "(func))"
@@ -367,6 +370,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 	}
 
 	if z, err := json.Marshal(v); err == nil {
+		//fmt.Println("kind is:", kind.String())
 		return fmt.Sprintf("(go: unknown type: '%+v', as JSON: '%s')", v, z)
 	}
 
