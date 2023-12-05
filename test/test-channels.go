@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	json_logging "github.com/oresoftware/json-logging"
+	json_logging "github.com/oresoftware/json-logging/jlog"
 	"github.com/oresoftware/json-logging/test/logging"
 	"sync"
 	"time"

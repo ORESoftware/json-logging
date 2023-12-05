@@ -186,7 +186,6 @@ func (l *Logger) Create(m *map[string]interface{}) *Logger {
 func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 
 	date := time.Now().UTC().String()[11:25] // only first 25 chars
-
 	stylizedLevel := level
 
 	switch level {
@@ -246,7 +245,7 @@ func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 			}
 		}
 
-		if isNonPrimitive() {
+		if isNonPrimitive(kind) {
 			primitive = false
 		}
 
@@ -263,6 +262,10 @@ func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 		}
 
 		if !primitive {
+
+			if _, err := safeStdout.Write([]byte("\n")); err != nil {
+				fmt.Println(err)
+			}
 
 			zz := fmt.Sprintf("sprintf: %+v", v)
 			if _, err := safeStdout.Write([]byte(zz)); err != nil {
@@ -338,7 +341,8 @@ func (l *Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 		buf, err = json.Marshal([8]interface{}{"@bunion", l.AppName, level, pid, l.HostName, date, m, cleaned})
 
 		if err != nil {
-			panic(errors.New("could not marshal the slice: " + err.Error()))
+			fmt.Println(errors.New("Json-Logging: could not marshal the slice: " + err.Error()))
+			return
 		}
 	}
 
