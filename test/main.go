@@ -1,7 +1,6 @@
 package main
 
 import (
-	. "github.com/oresoftware/json-logging/test/logging"
 	"os"
 )
 
@@ -29,7 +28,7 @@ func main() {
 	//	dog int
 	//}{"age", 5}})
 
-	Log.Info("'foo'", 55, main, true, struct{ Boo string }{"fudge"}, map[int]int{}, map[string]interface{}{"fpp": "age", "boop": struct {
+	fog.Info("'foo'", 55, main, true, struct{ Boo string }{"fudge"}, map[int]int{}, map[string]interface{}{"fpp": "age", "boop": struct {
 		Bop string
 		dog int
 		c   chan int
@@ -47,7 +46,7 @@ func main() {
 
 	//Log.Info(Zoom{})
 
-	Log.Info(Zoom{}, Zoom{}, Zoom{}, Zoom{}, struct {
+	fog.Info(Zoom{}, Zoom{}, Zoom{}, Zoom{}, struct {
 		Foo  string `json:"foo"`
 		Butt Zoom   `json:"buff"`
 	}{"bar", Zoom{

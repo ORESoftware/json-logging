@@ -6,7 +6,6 @@ import (
 	"github.com/logrusorgru/aurora"
 	"log"
 	"reflect"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,7 +25,7 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, ca
 	n := len(keys)
 
 	if n < 1 {
-		return fmt.Sprintf("(%T)", x)
+		return fmt.Sprintf(aurora.Black("(empty %T)").String(), x)
 	}
 
 	//s := createSpaces(depth, brk) + aurora.Bold("map(").String() + createNewline(brk, true)
@@ -42,7 +41,7 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, ca
 		//	getStringRepresentation(val.Interface(), nil, size, brk, depth+1, cache) +
 		//	addComma(i, n)
 
-		z := fmt.Sprintf("%v", k.Interface()) + " => " + fmt.Sprintf("%v", val.Interface()) + addComma(i, n)
+		z := fmt.Sprintf("%v", k.Interface()) + " -> " + fmt.Sprintf("%v", val.Interface()) + addComma(i, n)
 		size = size + len(z)
 		values = append(values, z)
 	}
@@ -59,23 +58,23 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, ca
 
 	var b strings.Builder
 
-	b.WriteString(aurora.Black(fmt.Sprintf("%T (", x)).String() + createNewline(brk, true))
+	b.WriteString(aurora.Bold(fmt.Sprintf("%T (", x)).String() + createNewline(brk, true))
 
 	for i := 0; i < n; i++ {
 		b.WriteString(createSpaces(depth, brk) + values[i] + createNewline(brk, true))
 	}
 
 	b.WriteString(createSpaces(depth-1, brk))
-	b.WriteString(aurora.Black(")").String() + createNewline(brk, false))
+	b.WriteString(aurora.Bold(")").String() + createNewline(brk, false))
 	return b.String()
 }
 
-func handleSliceAndArray(val reflect.Value, len int, brk bool, depth int, cache *map[*interface{}]string) string {
+func handleSliceAndArray(vv interface{}, val reflect.Value, len int, brk bool, depth int, cache *map[*interface{}]string) string {
 
 	n := val.Len()
 
 	if n < 1 {
-		return aurora.Bold("[").String() + " " + aurora.Bold("]").String()
+		return aurora.Black("[").String() + "" + aurora.Black(fmt.Sprintf("] (empty %T)", vv)).String()
 	}
 
 	var b strings.Builder
@@ -200,6 +199,92 @@ type ToString interface {
 //sb.WriteString(" years old.")
 //greeting := sb.String()
 // write direct to stdout using: sb.WriteTo(os.Stdout)
+
+func getFuncSignature(v interface{}) string {
+
+	funcValue := reflect.ValueOf(v)
+	funcType := funcValue.Type()
+	name := funcType.Name()
+
+	// Function signature
+	var params []string
+	for i := 0; i < funcType.NumIn(); i++ {
+		vv := funcType.In(i)
+		nm := vv.Name()
+		if vv.Kind() == reflect.Ptr {
+			nm = vv.Elem().Name()
+		}
+		if vv.Kind() == reflect.Pointer {
+			nm = vv.Elem().Name()
+		}
+		if vv.Kind() == reflect.UnsafePointer {
+			nm = vv.Elem().Name()
+		}
+		if vv.Kind() == reflect.Func {
+			nm = vv.Elem().Name()
+			if strings.TrimSpace(nm) == "" {
+				nm = "func"
+			}
+		}
+		if strings.TrimSpace(nm) == "" {
+			nm = "<unk>"
+		}
+		params = append(params, nm)
+	}
+
+	var returns []string
+	for i := 0; i < funcType.NumOut(); i++ {
+		vv := funcType.Out(i)
+		nm := vv.Name()
+		kind := vv.Kind()
+		if kind == reflect.Ptr {
+			nm = vv.Elem().Name()
+		}
+		if kind == reflect.Pointer {
+			nm = vv.Elem().Name()
+		}
+
+		if kind == reflect.UnsafePointer {
+			nm = vv.Elem().Name()
+		}
+		if kind == reflect.Func {
+			nm = vv.Elem().Name()
+			if strings.TrimSpace(nm) == "" {
+				nm = "func"
+			}
+		}
+
+		if strings.TrimSpace(nm) == "" {
+			nm = "<unk>"
+		}
+		returns = append(returns, nm)
+	}
+
+	paramsStr := strings.Join(params, ", ")
+	returnsStr := strings.Join(returns, ", ")
+
+	if len(returns) < 1 {
+		if name != "" {
+			return fmt.Sprintf("func %s(%s)", name, paramsStr)
+		}
+
+		return fmt.Sprintf("(func(%s))", paramsStr)
+	}
+
+	if len(returns) < 2 {
+		if name != "" {
+			return fmt.Sprintf("(func %s(%s) => %s)", name, paramsStr, returnsStr)
+		}
+
+		return fmt.Sprintf("(func(%s) => %s)", paramsStr, returnsStr)
+	}
+
+	if name != "" {
+		return fmt.Sprintf("(func %s(%s) => (%s))", name, paramsStr, returnsStr)
+	}
+
+	return fmt.Sprintf("(func(%s) => (%s))", paramsStr, returnsStr)
+}
 
 var mutex sync.Mutex
 
@@ -337,7 +422,7 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 		(*cache)[vv] = "(circular)"
 		//fmt.Printf("Slice cache: '%v'", len(*cache))
 		mutex.Unlock()
-		(*cache)[vv] = handleSliceAndArray(val, size, brk, depth, cache)
+		(*cache)[vv] = handleSliceAndArray(v, val, size, brk, depth, cache)
 		//safeStdout.Write([]byte((*cache)[&v]))
 		return (*cache)[vv]
 	}
@@ -352,12 +437,13 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 		(*cache)[vv] = "(circular)"
 		//fmt.Printf("Array cache: '%v'", len(*cache))
 		mutex.Unlock()
-		(*cache)[vv] = handleSliceAndArray(val, size, brk, depth, cache)
+		(*cache)[vv] = handleSliceAndArray(v, val, size, brk, depth, cache)
 		return (*cache)[vv]
 	}
 
 	if kind == reflect.Func {
-		return "(" + runtime.FuncForPC(val.Pointer()).Name() + "(func))"
+		//return "(" + runtime.FuncForPC(val.Pointer()).Name() + "(func))"
+		return getFuncSignature(v)
 	}
 
 	if kind == reflect.Struct {
