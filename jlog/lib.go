@@ -7,9 +7,11 @@ import (
 	"github.com/logrusorgru/aurora"
 	"github.com/oresoftware/json-logging/jlog/writer"
 	"golang.org/x/crypto/ssh/terminal"
+	"log"
 	"os"
 	"reflect"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -58,8 +60,15 @@ func New(AppName string, forceJSON bool, hostName string) *Logger {
 		}
 	}
 
+	var isLoggingJson = !isTerminal
+
+	if os.Getenv("jlog_log_json") == "no" {
+		isLoggingJson = false
+	}
+
 	return &Logger{
-		IsLoggingJSON: !isTerminal && !forceJSON,
+		//IsLoggingJSON: !isTerminal && !forceJSON,
+		IsLoggingJSON: isLoggingJson,
 		AppName:       AppName,
 		HostName:      hostName,
 	}
@@ -267,19 +276,22 @@ func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 				fmt.Println(err)
 			}
 
+			safeStdout.Write([]byte("\n"))
 			zz := fmt.Sprintf("sprintf: %+v", v)
 			if _, err := safeStdout.Write([]byte(zz)); err != nil {
 				fmt.Println(err)
 			}
 
-			safeStdout.Write([]byte("json:"))
-			if x, err := json.Marshal(v); err == nil {
-				if _, err := safeStdout.Write([]byte(x)); err != nil {
-					fmt.Println("err1:", err)
-				}
-			} else {
-				fmt.Println("err2:", err)
-			}
+			safeStdout.Write([]byte("\n"))
+
+			//safeStdout.Write([]byte("json:"))
+			//if x, err := json.Marshal(v); err == nil {
+			//	if _, err := safeStdout.Write([]byte(x)); err != nil {
+			//		fmt.Println("err1:", err)
+			//	}
+			//} else {
+			//	fmt.Println("err2:", err)
+			//}
 
 		}
 
@@ -363,6 +375,22 @@ func (l *Logger) writeSwitch(level string, m *MetaFields, args *[]interface{}) {
 		l.writeJSON(level, m, args)
 	} else {
 		l.writePretty(level, m, args)
+	}
+}
+
+func (l *Logger) PrintEnvPlain() {
+	envVars := os.Environ() // Get all environment variables as a slice
+	sort.Strings(envVars)
+	for _, env := range envVars {
+		log.Println(env)
+	}
+}
+
+func (l *Logger) PrintEnv() {
+	envVars := os.Environ() // Get all environment variables as a slice
+	sort.Strings(envVars)
+	for _, env := range envVars {
+		l.Info(env)
 	}
 }
 
@@ -485,10 +513,10 @@ func getFilteredStacktrace() string {
 
 	// Filter the stack trace
 	lines := strings.Split(stackTrace, "\n")
-	var filteredLines []string
+	var filteredLines = []string{""}
 	for _, line := range lines {
-		if !strings.Contains(line, "github.com/oresoftware") {
-			filteredLines = append(filteredLines, line)
+		if !strings.Contains(line, "oresoftware/json-logging") {
+			filteredLines = append(filteredLines, fmt.Sprintf("\t%s", strings.TrimSpace(line)))
 		}
 	}
 
@@ -517,7 +545,7 @@ func (l *Logger) WarningF(s string, args ...interface{}) {
 }
 
 type StackTrace struct {
-	StackTrace string
+	Trace string
 }
 
 func (l *Logger) ErrorF(s string, args ...interface{}) {

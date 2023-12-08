@@ -41,7 +41,7 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, ca
 		//	getStringRepresentation(val.Interface(), nil, size, brk, depth+1, cache) +
 		//	addComma(i, n)
 
-		z := fmt.Sprintf("%v", k.Interface()) + " -> " + fmt.Sprintf("%v", val.Interface()) + addComma(i, n)
+		z := fmt.Sprintf("%v", k.Interface()) + " —> " + fmt.Sprintf("%v", val.Interface()) + addComma(i, n)
 		size = size + len(z)
 		values = append(values, z)
 	}
@@ -227,6 +227,9 @@ func getFuncSignature(v interface{}) string {
 			}
 		}
 		if strings.TrimSpace(nm) == "" {
+			nm = vv.String()
+		}
+		if strings.TrimSpace(nm) == "" {
 			nm = "<unk>"
 		}
 		params = append(params, nm)
@@ -253,7 +256,9 @@ func getFuncSignature(v interface{}) string {
 				nm = "func"
 			}
 		}
-
+		if strings.TrimSpace(nm) == "" {
+			nm = vv.String()
+		}
 		if strings.TrimSpace(nm) == "" {
 			nm = "<unk>"
 		}
@@ -309,6 +314,9 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 	if !val.IsValid() {
 		return fmt.Sprintf("(%s <nil>)", reflect.TypeOf(v).Kind().String())
 	}
+
+	originalV := v
+	originalVal := val
 
 	var kind = val.Kind()
 
@@ -422,7 +430,15 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 		(*cache)[vv] = "(circular)"
 		//fmt.Printf("Slice cache: '%v'", len(*cache))
 		mutex.Unlock()
-		(*cache)[vv] = handleSliceAndArray(v, val, size, brk, depth, cache)
+
+		var x = ""
+		if m, ok := v.(Stringer); ok {
+			x = m.String()
+			(*cache)[vv] = fmt.Sprintf("(As string: %s), Slice:", x) + handleSliceAndArray(v, val, size, brk, depth, cache)
+		} else {
+			(*cache)[vv] = handleSliceAndArray(v, val, size, brk, depth, cache)
+		}
+
 		//safeStdout.Write([]byte((*cache)[&v]))
 		return (*cache)[vv]
 	}
@@ -437,7 +453,16 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 		(*cache)[vv] = "(circular)"
 		//fmt.Printf("Array cache: '%v'", len(*cache))
 		mutex.Unlock()
-		(*cache)[vv] = handleSliceAndArray(v, val, size, brk, depth, cache)
+
+		var x = ""
+		if m, ok := v.(Stringer); ok {
+			x = m.String()
+			(*cache)[vv] = fmt.Sprintf("(As string: %s), Array:", x) + handleSliceAndArray(v, val, size, brk, depth, cache)
+		} else {
+			(*cache)[vv] = handleSliceAndArray(v, val, size, brk, depth, cache)
+
+		}
+
 		return (*cache)[vv]
 	}
 
@@ -572,10 +597,19 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 
 	if z, err := json.Marshal(v); err == nil {
 		//fmt.Println("kind is:", kind.String())
-		return fmt.Sprintf("(go: unknown type: '%+v/%+v', as JSON: '%s', kind: %s)", v, val, z, kind.String())
+		if originalV != v {
+			return fmt.Sprintf("(go: unknown type: '%+v/%+v/%v/%v', as JSON: '%s', kind: %s)", v, val, originalV, originalVal, z, kind.String())
+		} else {
+			return fmt.Sprintf("(go: unknown type: '%+v/%+v', as JSON: '%s', kind: %s)", v, val, z, kind.String())
+		}
+
 	}
 
-	return fmt.Sprintf("(go: unknown type: '%+v / %+v')", v, val)
+	if originalV != v {
+		return fmt.Sprintf("(go: unknown type: '%+v / %+v / %v / %v')", v, val, originalV, originalVal)
+	} else {
+		return fmt.Sprintf("(go: unknown type: '%+v / %+v')", v, val)
+	}
 
 }
 
