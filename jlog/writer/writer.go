@@ -22,9 +22,15 @@ func (sw *SafeWriter) Unlock() {
 	sw.m.Unlock()
 }
 
+func (sw *SafeWriter) WriteString(p string) (n int, err error) {
+	sw.Lock()
+	defer sw.Unlock()
+	return sw.w.WriteString(p)
+}
+
 func (sw *SafeWriter) WriteAllWithSelfLock(p []byte) (n int, err error) {
-	sw.m.Lock()
-	defer sw.m.Unlock()
+	sw.Lock()
+	defer sw.Unlock()
 	return (*sw.w).Write(p)
 }
 

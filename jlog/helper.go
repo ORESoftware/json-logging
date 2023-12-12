@@ -82,8 +82,10 @@ func handleSliceAndArray(vv interface{}, val reflect.Value, len int, brk bool, d
 
 	for i := 0; i < n; i++ {
 		b.WriteString(createSpaces(depth, brk))
-		intrfce := val.Index(i).Interface()
-		b.WriteString(getStringRepresentation(&intrfce, &intrfce, len, brk, depth, cache))
+		x := val.Index(i)
+		val := x.Interface()
+		ptr := x.Addr().Interface()
+		b.WriteString(getStringRepresentation(val, &ptr, len, brk, depth, cache))
 		b.WriteString(addComma(i, n))
 	}
 
@@ -128,37 +130,20 @@ func handleStruct(val reflect.Value, size int, brk bool, depth int, cache *map[*
 	for i := 0; i < n; i++ {
 
 		k := t.Field(i).Name
-		// keys => s += createSpaces(depth, brk) + k + ":"
 
 		keys = append(keys, k+":")
 		size = size + len(keys)
-		//if strings.ToLower(k[:1]) == k[:1] {
-		//	s += "(unknown val)"
-		//	continue
-		//}
-
-		//rs := reflect.ValueOf(val.Interface()).Elem()
-		//rf := rs.Field(i)
-		// note technique stolen from here: https://stackoverflow.com/a/43918797/12211419
 
 		rs := reflect.New(t).Elem()
 		rs.Set(val)
 		rf := rs.Field(i)
 		rf = reflect.NewAt(rf.Type(), unsafe.Pointer(rf.UnsafeAddr())).Elem()
 
-		//if val.CanInterface() {
-		//	s += "(unknown val)"
-		//	continue
-		//}
-
-		//fv := val.FieldByName(k)
-		//fmt.Println(fv.Interface()) // 2
-		//v := val.Field(i).Interface()
-
 		v := rf.Interface()
+		ptr := rf.Addr().Interface()
 
 		//v := fv.Interface()
-		z := getStringRepresentation(&v, &v, size, brk, depth+1, cache)
+		z := getStringRepresentation(&v, &ptr, size, brk, depth+1, cache)
 
 		values = append(values, z)
 		size = size + len(z)
@@ -301,6 +286,17 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 		}
 	}()
 
+	mutex.Lock()
+
+	if v, ok := (*cache)[vv]; ok {
+		// TODO: verify the caching logic
+		log.Println(aurora.Red("map cached used."))
+		mutex.Unlock()
+		return v
+	}
+
+	mutex.Unlock()
+
 	if &v == nil {
 		return "<nil>"
 	}
@@ -434,9 +430,9 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 		var x = ""
 		if m, ok := v.(Stringer); ok {
 			x = m.String()
-			(*cache)[vv] = fmt.Sprintf("(As string: %s), Slice:", x) + handleSliceAndArray(v, val, size, brk, depth, cache)
+			(*cache)[vv] = fmt.Sprintf("(As string: %s), Slice:", x) + handleSliceAndArray(vv, val, size, brk, depth, cache)
 		} else {
-			(*cache)[vv] = handleSliceAndArray(v, val, size, brk, depth, cache)
+			(*cache)[vv] = handleSliceAndArray(vv, val, size, brk, depth, cache)
 		}
 
 		//safeStdout.Write([]byte((*cache)[&v]))
@@ -457,9 +453,9 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 		var x = ""
 		if m, ok := v.(Stringer); ok {
 			x = m.String()
-			(*cache)[vv] = fmt.Sprintf("(As string: %s), Array:", x) + handleSliceAndArray(v, val, size, brk, depth, cache)
+			(*cache)[vv] = fmt.Sprintf("(As string: %s), Array:", x) + handleSliceAndArray(vv, val, size, brk, depth, cache)
 		} else {
-			(*cache)[vv] = handleSliceAndArray(v, val, size, brk, depth, cache)
+			(*cache)[vv] = handleSliceAndArray(vv, val, size, brk, depth, cache)
 
 		}
 
@@ -615,5 +611,5 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 
 func getPrettyString(v interface{}, size int) string {
 	var cache = make(map[*interface{}]string)
-	return getStringRepresentation(v, &v, size, false, 2, (&cache))
+	return getStringRepresentation(v, &v, size, false, 2, &cache)
 }

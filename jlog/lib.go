@@ -14,11 +14,14 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 var isTerminal = terminal.IsTerminal(int(os.Stdout.Fd()))
 var pid = os.Getpid()
+
+var m1 = sync.Mutex{}
 
 var safeStdout = writer.NewSafeWriter(os.Stdout)
 var safeStderr = writer.NewSafeWriter(os.Stderr)
@@ -102,7 +105,7 @@ func NewLogger(AppName string, forceJSON bool, hostName string) *Logger {
 type KV struct {
 	Key   string
 	Value interface{}
-	*marker
+	*metaFieldsMarker
 }
 
 type M = map[string]interface{}
@@ -152,9 +155,9 @@ func copyAndDereference(s interface{}) interface{} {
 
 func NewMetaFields(m *map[string]interface{}) *MetaFields {
 	return &MetaFields{
-		marker:       mark,
-		UniqueMarker: "UniqueMarker(Brand)",
-		m:            m,
+		metaFieldsMarker: mfMarker,
+		UniqueMarker:     "UniqueMarker(Brand)",
+		m:                m,
 	}
 }
 
@@ -225,11 +228,11 @@ func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 		aurora.Gray(12, "app:").String() + aurora.Italic(l.AppName).String(), " ",
 	}
 
-	defer safeStdout.Unlock()
-	safeStdout.Lock()
+	defer m1.Unlock()
+	m1.Lock()
 
 	for _, v := range buf {
-		if _, err := safeStdout.Write([]byte(v)); err != nil {
+		if _, err := safeStdout.WriteString(v); err != nil {
 			fmt.Println(err)
 		}
 	}
@@ -267,22 +270,22 @@ func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 		}
 
 		if _, err := safeStdout.Write([]byte(s)); err != nil {
-			fmt.Println(err)
+			fmt.Fprintln(os.Stderr, "771c710b-aba2-46ef-9126-c26d3dfe7925", err)
 		}
 
 		if !primitive {
 
 			if _, err := safeStdout.Write([]byte("\n")); err != nil {
-				fmt.Println(err)
+				fmt.Fprintln(os.Stderr, "18614292-658f-42a5-81e7-593e941ea857", err)
 			}
 
-			safeStdout.Write([]byte("\n"))
+			safeStdout.WriteString("\n")
 			zz := fmt.Sprintf("sprintf: %+v", v)
-			if _, err := safeStdout.Write([]byte(zz)); err != nil {
-				fmt.Println(err)
+			if _, err := safeStdout.WriteString(zz); err != nil {
+				fmt.Fprintln(os.Stderr, "2a795ef2-65bb-4a03-9808-b072e4497d73", err)
 			}
 
-			safeStdout.Write([]byte("\n"))
+			safeStdout.WriteString("\n")
 
 			//safeStdout.Write([]byte("json:"))
 			//if x, err := json.Marshal(v); err == nil {
@@ -297,8 +300,8 @@ func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 
 	}
 
-	if _, err := safeStdout.Write([]byte("\n")); err != nil {
-		fmt.Println(err)
+	if _, err := safeStdout.WriteString("\n"); err != nil {
+		fmt.Fprintln(os.Stderr, "f834d14a-9735-4fd6-9389-f79144044746", err)
 	}
 }
 
@@ -322,8 +325,8 @@ func (l *Logger) writeJSONFromFormattedStr(level string, m *MetaFields, s *[]int
 	if err != nil {
 		DefaultLogger.Warn(err)
 	} else {
-		os.Stdout.Write(buf)
-		os.Stdout.Write([]byte("\n"))
+		safeStdout.Write(buf)
+		safeStdout.Write([]byte("\n"))
 	}
 
 }
@@ -347,6 +350,7 @@ func (l *Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 		var cleaned = make([]interface{}, 0)
 
 		for i := 0; i < len(*args); i++ {
+			// TODO: for now instead of cleanUp, we can ust fmt.Sprintf()
 			cleaned = append(cleaned, cleanUp((*args)[i]))
 		}
 
@@ -452,13 +456,39 @@ func (l *Logger) Trace(args ...interface{}) {
 	l.writeSwitch("TRACE", nil, &args)
 }
 
-// brand the below struct with unique ref
-type marker struct{}
+type errorIdMarker struct{}
 
-var mark = &marker{}
+var eidMarker = &errorIdMarker{}
+
+type ErrorId struct {
+	Id            string
+	errorIdMarker *errorIdMarker
+}
+
+type Opts struct {
+	IsPrintStackTrace bool
+	errorIdMarker     *errorIdMarker
+}
+
+func ErrId(id string) *ErrorId {
+	return &ErrorId{
+		id, eidMarker,
+	}
+}
+
+func ErrOpts(id string) *ErrorId {
+	return &ErrorId{
+		id, eidMarker,
+	}
+}
+
+// brand the below struct with unique ref
+type metaFieldsMarker struct{}
+
+var mfMarker = &metaFieldsMarker{}
 
 type MetaFields struct {
-	*marker
+	*metaFieldsMarker
 	UniqueMarker string
 	m            *map[string]interface{}
 }

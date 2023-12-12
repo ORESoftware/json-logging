@@ -18,20 +18,20 @@ var stdout = logger.New(appName, false, "")
 
 var Info = stdout.Info
 
-var Infof = stdout.Infof
+var InfoF = stdout.InfoF
 
 var Warning = stdout.Warning
 
-var Warningf = stdout.Warningf
+var WarningF = stdout.WarningF
 
 var Error = stdout.Error
 
-var Errorf = stdout.Errorf
+var Errorf = stdout.ErrorF
 
 var Trace = stdout.Trace
 
-var Tracef = stdout.Tracef
+var Tracef = stdout.TraceF
 
 var Debug = stdout.Debug
 
-var Debugf = stdout.Debugf
+var Debugf = stdout.DebugF
