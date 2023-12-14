@@ -481,19 +481,19 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 		return (*cache)[vv]
 	}
 
-	if kind == reflect.String {
-		return "'" + aurora.Green(v).String() + "'"
-	}
-
 	if z, ok := v.(string); ok {
 		if len(z) < 1 {
-			return "''"
+			return aurora.Bold("''").String()
 		}
 		var trimmed = strings.TrimSpace(z)
 		if len(trimmed) == len(z) {
 			return aurora.Green(z).String()
 		}
 		return aurora.Bold("'").String() + aurora.Green(z).String() + aurora.Bold("'").String()
+	}
+
+	if kind == reflect.String {
+		return "'" + aurora.Green(v).String() + "'"
 	}
 
 	if kind == reflect.Bool {
