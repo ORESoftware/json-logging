@@ -28,12 +28,8 @@ func (sw *SafeWriter) WriteString(p string) (n int, err error) {
 	return sw.w.WriteString(p)
 }
 
-func (sw *SafeWriter) WriteAllWithSelfLock(p []byte) (n int, err error) {
+func (sw *SafeWriter) Write(p []byte) (n int, err error) {
 	sw.Lock()
 	defer sw.Unlock()
-	return (*sw.w).Write(p)
-}
-
-func (sw *SafeWriter) Write(p []byte) (n int, err error) {
 	return (*sw.w).Write(p)
 }

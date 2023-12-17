@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/logrusorgru/aurora"
+	"github.com/oresoftware/json-logging/jlog/stack"
 	"github.com/oresoftware/json-logging/jlog/writer"
 	"golang.org/x/crypto/ssh/terminal"
 	"log"
@@ -26,6 +28,8 @@ var m1 = sync.Mutex{}
 var safeStdout = writer.NewSafeWriter(os.Stdout)
 var safeStderr = writer.NewSafeWriter(os.Stderr)
 
+var lockStack = stack.NewStack()
+
 type Logger struct {
 	AppName       string
 	IsLoggingJSON bool
@@ -34,6 +38,7 @@ type Logger struct {
 	ForceNonJSON  bool
 	TimeZone      string
 	MetaFields    *MetaFields
+	LockUuid      string
 }
 
 type LoggerParams struct {
@@ -44,6 +49,7 @@ type LoggerParams struct {
 	ForceNonJSON  bool
 	MetaFields    MetaFields
 	TimeZone      string
+	LockUuid      string
 }
 
 func New(AppName string, forceJSON bool, hostName string) *Logger {
@@ -161,6 +167,51 @@ func NewMetaFields(m *map[string]interface{}) *MetaFields {
 	}
 }
 
+func (l *Logger) Lock() *Logger {
+	var newLck = &sync.Mutex{}
+	newLck.Lock()
+	var id = uuid.New()
+	lockStack.Push(&stack.StackItem{
+		Id:  id,
+		Lck: newLck,
+	})
+	return &Logger{
+		AppName:       l.AppName,
+		IsLoggingJSON: l.IsLoggingJSON,
+		HostName:      l.HostName,
+		ForceJSON:     l.ForceJSON,
+		ForceNonJSON:  l.ForceNonJSON,
+		TimeZone:      l.TimeZone,
+		MetaFields:    l.MetaFields,
+		LockUuid:      id,
+	}
+}
+
+func (l *Logger) Unlock() {
+
+	m1.Lock()
+	defer m1.Unlock()
+
+	var peek, err = lockStack.Peek()
+
+	if peek == nil {
+		panic("error with lib - peek should not be nil")
+		return
+	}
+
+	if err != nil {
+		panic("error should be nil if peek item exists")
+	}
+
+	if peek.Id != l.LockUuid {
+		panic("lock ids do not match")
+	}
+
+	lockStack.Pop()
+	peek.Lck.Unlock()
+
+}
+
 func (l *Logger) Child(m *map[string]interface{}) *Logger {
 
 	var z = make(map[string]interface{})
@@ -230,6 +281,33 @@ func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 
 	defer m1.Unlock()
 	m1.Lock()
+
+	peekItem, err := lockStack.Peek()
+
+	if err != nil && peekItem != nil {
+		panic("library error.")
+	}
+
+	if peekItem != nil {
+
+		if peekItem.Id != l.LockUuid {
+			peekItem.Lck.Lock()
+			defer func() {
+				peekItem.Lck.Unlock()
+			}()
+		}
+		//if peekItem.Id == l.LockUuid {
+		//	defer func() {
+		//		peekItem.Lck.Unlock()
+		//		lockStack.Pop()
+		//	}()
+		//} else {
+		//	peekItem.Lck.Lock()
+		//	defer func() {
+		//		peekItem.Lck.Unlock()
+		//	}()
+		//}
+	}
 
 	for _, v := range buf {
 		if _, err := safeStdout.WriteString(v); err != nil {
@@ -342,8 +420,7 @@ func (l *Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 
 		_, file, line, _ := runtime.Caller(3)
 
-		DefaultLogger.Warn("could not marshal the slice:", err.Error(),
-			"file://"+file+":"+strconv.Itoa(line))
+		DefaultLogger.Warn("could not marshal the slice:", err.Error(), "file://"+file+":"+strconv.Itoa(line))
 
 		//cleaned := make([]interface{},0)
 
@@ -362,8 +439,10 @@ func (l *Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 		}
 	}
 
-	os.Stdout.Write(buf)
-	os.Stdout.Write([]byte("\n"))
+	m1.Lock()
+	safeStdout.Write(buf)
+	safeStdout.Write([]byte("\n"))
+	m1.Unlock()
 }
 
 func (l *Logger) writeSwitchForFormattedString(level string, m *MetaFields, s *[]interface{}) {
@@ -593,31 +672,35 @@ func (l *Logger) TraceF(s string, args ...interface{}) {
 }
 
 func (l *Logger) NewLine() {
-	os.Stdout.Write([]byte("\n"))
+	safeStdout.Write([]byte("\n"))
 }
 
 func (l *Logger) Spaces(num int32) {
-	os.Stdout.Write([]byte(strings.Join(make([]string, num), " ")))
+	safeStdout.Write([]byte(strings.Join(make([]string, num), " ")))
 }
 
 func (l *Logger) Tabs(num int32) {
-	os.Stdout.Write([]byte(strings.Join(make([]string, num), "\t")))
+	safeStdout.Write([]byte(strings.Join(make([]string, num), "\t")))
 }
 
 func (l *Logger) PlainStdout(args ...interface{}) {
+	safeStdout.Lock()
 	for _, a := range args {
 		v := fmt.Sprintf("((%T) %#v) ", a, a)
 		os.Stdout.Write([]byte(v))
 	}
 	os.Stdout.Write([]byte("\n"))
+	safeStdout.Unlock()
 }
 
 func (l *Logger) PlainStderr(args ...interface{}) {
+	safeStderr.Lock()
 	for _, a := range args {
 		v := fmt.Sprintf("((%T) %#v) ", a, a)
 		os.Stderr.Write([]byte(v))
 	}
 	os.Stderr.Write([]byte("\n"))
+	safeStderr.Unlock()
 }
 
 var DefaultLogger = Logger{
