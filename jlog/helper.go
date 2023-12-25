@@ -84,7 +84,13 @@ func handleSliceAndArray(vv interface{}, val reflect.Value, len int, brk bool, d
 		b.WriteString(createSpaces(depth, brk))
 		x := val.Index(i)
 		val := x.Interface()
-		ptr := x.Addr().Interface()
+		ptr := val
+		if x.CanAddr() {
+			ptr = x.Addr().Interface()
+		}
+		//if x.IsValid() {
+		//
+		//}
 		b.WriteString(getStringRepresentation(val, &ptr, len, brk, depth, cache))
 		b.WriteString(addComma(i, n))
 	}
@@ -137,10 +143,24 @@ func handleStruct(val reflect.Value, size int, brk bool, depth int, cache *map[*
 		rs := reflect.New(t).Elem()
 		rs.Set(val)
 		rf := rs.Field(i)
-		rf = reflect.NewAt(rf.Type(), unsafe.Pointer(rf.UnsafeAddr())).Elem()
 
-		v := rf.Interface()
-		ptr := rf.Addr().Interface()
+		var v interface{}
+		var ptr interface{}
+
+		if rf.CanAddr() {
+			// It's safe to use UnsafeAddr and NewAt since rf is addressable
+			rf = reflect.NewAt(rf.Type(), unsafe.Pointer(rf.UnsafeAddr())).Elem()
+			v = rf.Interface()
+			ptr = rf.Addr().Interface()
+		} else {
+			// Handle the case where rf is not addressable
+			// You might need to create a copy or take a different approach
+			// Example: Creating a copy
+			myCopy := reflect.New(rf.Type()).Elem()
+			myCopy.Set(rf)
+			v = myCopy.Interface()
+			ptr = myCopy.Addr().Interface()
+		}
 
 		//v := fv.Interface()
 		z := getStringRepresentation(&v, &ptr, size, brk, depth+1, cache)
@@ -305,7 +325,7 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 		return "<nil>"
 	}
 
-	val := reflect.ValueOf(v)
+	val := reflect.ValueOf(&v)
 
 	if !val.IsValid() {
 		return fmt.Sprintf("(%s <nil>)", reflect.TypeOf(v).Kind().String())
@@ -327,6 +347,10 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 				return "<nil>"
 			}
 
+			if &v == nil {
+				return "<nil>"
+			}
+
 			val = reflect.ValueOf(v)
 			kind = val.Kind()
 		}
@@ -343,6 +367,10 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 				return "<nil>"
 			}
 
+			if &v == nil {
+				return "<nil>"
+			}
+
 			val = reflect.ValueOf(v)
 			kind = val.Kind()
 		}
@@ -356,6 +384,10 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 			v = val.Interface()
 
 			if v == nil {
+				return "<nil>"
+			}
+
+			if &v == nil {
 				return "<nil>"
 			}
 

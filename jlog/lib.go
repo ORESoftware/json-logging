@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
+	uuid "github.com/google/uuid"
 	"github.com/logrusorgru/aurora"
 	"github.com/oresoftware/json-logging/jlog/stack"
 	"github.com/oresoftware/json-logging/jlog/writer"
@@ -71,8 +71,16 @@ func New(AppName string, forceJSON bool, hostName string) *Logger {
 
 	var isLoggingJson = !isTerminal
 
+	if forceJSON {
+		isLoggingJson = true
+	}
+
 	if os.Getenv("jlog_log_json") == "no" {
 		isLoggingJson = false
+	}
+
+	if os.Getenv("jlog_log_json") == "yes" {
+		isLoggingJson = true
 	}
 
 	return &Logger{
@@ -167,15 +175,17 @@ func NewMetaFields(m *map[string]interface{}) *MetaFields {
 	}
 }
 
-func (l *Logger) Lock() *Logger {
+func (l *Logger) NewLoggerWithLock() (*Logger, func()) {
+	m1.Lock()
+	defer m1.Unlock()
 	var newLck = &sync.Mutex{}
 	newLck.Lock()
-	var id = uuid.New()
+	var id = uuid.New().String()
 	lockStack.Push(&stack.StackItem{
 		Id:  id,
 		Lck: newLck,
 	})
-	return &Logger{
+	var z = Logger{
 		AppName:       l.AppName,
 		IsLoggingJSON: l.IsLoggingJSON,
 		HostName:      l.HostName,
@@ -185,9 +195,10 @@ func (l *Logger) Lock() *Logger {
 		MetaFields:    l.MetaFields,
 		LockUuid:      id,
 	}
+	return &z, z.unlock
 }
 
-func (l *Logger) Unlock() {
+func (l *Logger) unlock() {
 
 	m1.Lock()
 	defer m1.Unlock()
@@ -207,7 +218,13 @@ func (l *Logger) Unlock() {
 		panic("lock ids do not match")
 	}
 
-	lockStack.Pop()
+	lockStack.Print("123")
+	x, err := lockStack.Pop()
+	if x != peek {
+		panic("must equal peek")
+	}
+	fmt.Println("unlocking:", peek.Id)
+	lockStack.Print("456")
 	peek.Lck.Unlock()
 
 }
@@ -253,7 +270,7 @@ func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 
 	switch level {
 	case "ERROR":
-		stylizedLevel = aurora.Red(level).String()
+		stylizedLevel = aurora.Underline(aurora.Bold(aurora.Red(level))).String()
 		break
 
 	case "WARN":
@@ -279,19 +296,24 @@ func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 		aurora.Gray(12, "app:").String() + aurora.Italic(l.AppName).String(), " ",
 	}
 
-	defer m1.Unlock()
 	m1.Lock()
-
 	peekItem, err := lockStack.Peek()
 
 	if err != nil && peekItem != nil {
 		panic("library error.")
 	}
 
+	var doUnlock = false
 	if peekItem != nil {
 
 		if peekItem.Id != l.LockUuid {
+			//fmt.Println(fmt.Sprintf("%+v", lockStack))
+			doUnlock = true
+			m1.Unlock()
+			lockStack.Print("789")
+			fmt.Println("here 1", peekItem.Id)
 			peekItem.Lck.Lock()
+			fmt.Println("here 2")
 			defer func() {
 				peekItem.Lck.Unlock()
 			}()
@@ -308,6 +330,13 @@ func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 		//	}()
 		//}
 	}
+
+	if !doUnlock {
+		m1.Unlock()
+	}
+
+	defer m1.Unlock()
+	m1.Lock()
 
 	for _, v := range buf {
 		if _, err := safeStdout.WriteString(v); err != nil {

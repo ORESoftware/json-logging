@@ -1,4 +1,6 @@
-1. include git commit id in the metadata
+
+
+3. include git commit id in the metadata
 2. include git repo name in the metadata
 3. {"default":{"commitId":"", "repo":"", errorId:""}}
 

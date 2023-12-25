@@ -2,6 +2,7 @@ package stack
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 )
 
@@ -13,6 +14,7 @@ type StackItem struct {
 }
 
 type Stack struct {
+	mtx      sync.Mutex
 	elements []*StackItem
 }
 
@@ -21,13 +23,29 @@ func NewStack() *Stack {
 	return &Stack{elements: []*StackItem{}}
 }
 
+func (s *Stack) Print(z string) {
+	s.mtx.Lock()
+	fmt.Println(z)
+	for i := 0; i < len(s.elements); i++ {
+		fmt.Println(fmt.Sprintf("%v %+v", i, s.elements[i]))
+	}
+	s.mtx.Unlock()
+}
+
 // Push adds an element to the top of the stack.
 func (s *Stack) Push(element *StackItem) {
+	//
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 	s.elements = append(s.elements, element)
 }
 
 // Pop removes and returns the top element of the stack. If the stack is empty, an error is returned.
 func (s *Stack) Pop() (*StackItem, error) {
+	//
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
 	if len(s.elements) == 0 {
 		return nil, errors.New("stack is empty")
 	}
@@ -44,6 +62,10 @@ func (s *Stack) Pop() (*StackItem, error) {
 
 // Peek returns the top element of the stack without removing it. If the stack is empty, an error is returned.
 func (s *Stack) Peek() (*StackItem, error) {
+	//
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
 	if len(s.elements) == 0 {
 		return nil, errors.New("stack is empty")
 	}
@@ -53,5 +75,8 @@ func (s *Stack) Peek() (*StackItem, error) {
 
 // IsEmpty checks whether the stack is empty.
 func (s *Stack) IsEmpty() bool {
+	//
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 	return len(s.elements) == 0
 }
