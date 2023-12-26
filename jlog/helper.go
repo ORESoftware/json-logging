@@ -89,7 +89,7 @@ func handleSliceAndArray(vv *interface{}, val reflect.Value, len int, brk bool, 
 	elementType := t.Elem()
 
 	if elementType.Kind() == reflect.Uint8 {
-		return fmt.Sprintf("[]byte as str: '%s'", *vv)
+		return aurora.Bold("[]byte as str:").String() + fmt.Sprintf(" '%s'", *vv)
 	}
 
 	var b strings.Builder
@@ -197,7 +197,8 @@ func handleStruct(val reflect.Value, size int, brk bool, depth int, cache *map[*
 	b.WriteString(t.Name() + " {" + createNewline(brk, n > 0))
 
 	for i := 0; i < n; i++ {
-		b.WriteString(createSpaces(depth, brk) + keys[i])
+		var k = aurora.Bold(aurora.Blue(keys[i])).String()
+		b.WriteString(createSpaces(depth, brk) + k)
 		b.WriteString(" " + values[i] + addComma(i, n) + createNewline(brk, n > 0))
 	}
 
@@ -440,6 +441,13 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 	rfx := reflect.ValueOf(v)
 	if rfx.Kind() == reflect.Ptr && rfx.IsNil() {
 		return fmt.Sprintf("<nil> (%v)", reflect.TypeOf(v).String())
+	}
+
+	if kind == reflect.Interface {
+		myVal := reflect.ValueOf(v)
+		myElem := myVal.Elem()
+		myInf := myElem.Interface()
+		return getStringRepresentation(myInf, &myInf, size, brk, depth, cache)
 	}
 
 	if kind == reflect.Chan {

@@ -67,7 +67,7 @@ func New(AppName string, forceJSON bool, hostName string) *Logger {
 		if hostName == "" {
 			hn, err := os.Hostname()
 			if err != nil {
-				hostName = "unknown_hostname"
+				hostName = "<unknown_hostname>"
 			} else {
 				hostName = hn
 			}
@@ -85,6 +85,9 @@ func New(AppName string, forceJSON bool, hostName string) *Logger {
 	}
 
 	if os.Getenv("jlog_log_json") == "yes" {
+		if forceJSON {
+			WriteToStderr("forceJSON:true was used, but the 'jlog_log_json' env var was set to 'yes'.")
+		}
 		isLoggingJson = true
 	}
 
@@ -463,11 +466,12 @@ func (l *Logger) writeJSON(level string, m *MetaStruct, args *[]interface{}) {
 
 		//cleaned := make([]interface{},0)
 
+		var cache = map[*interface{}]string{}
 		var cleaned = make([]interface{}, 0)
 
 		for i := 0; i < len(*args); i++ {
 			// TODO: for now instead of cleanUp, we can ust fmt.Sprintf()
-			cleaned = append(cleaned, cleanUp(&(*args)[i]))
+			cleaned = append(cleaned, cleanUp(&(*args)[i], &cache))
 		}
 
 		buf, err = json.Marshal([8]interface{}{"@bunion:v1", l.AppName, level, pid, l.HostName, date, m, cleaned})
@@ -785,7 +789,7 @@ func (l *Logger) PlainStderr(args ...interface{}) {
 
 var DefaultLogger = NewLogger(
 	"Default",
-	false,
+	true,
 	"<hostname>",
 )
 

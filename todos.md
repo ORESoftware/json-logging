@@ -1,4 +1,6 @@
 
+1. lock section, so that 5 lines of logs can all be in order
+2. 
 
 3. include git commit id in the metadata
 2. include git repo name in the metadata

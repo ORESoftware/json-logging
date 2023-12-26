@@ -7,13 +7,28 @@ import (
 	"unsafe"
 )
 
-func copyStruct(original interface{}) interface{} {
-	originalVal := reflect.ValueOf(original)
+type Cache = *map[*interface{}]string
 
-	if originalVal.Kind() != reflect.Ptr || originalVal.Elem().Kind() != reflect.Struct {
-		return original
+func copyStruct(original interface{}, cache Cache) interface{} {
+	originalVal := reflect.ValueOf(original)
+	originalValElem := originalVal.Elem()
+	originalValIntf := originalValElem.Interface()
+
+	if originalVal.Kind() == reflect.Ptr {
+		if k, ok := (*cache)[&originalValIntf]; ok {
+			return k
+		}
 	}
-	originalVal = originalVal.Elem()
+
+	if originalValElem.Kind() == reflect.Ptr {
+		if k, ok := (*cache)[&originalValIntf]; ok {
+			return k
+		}
+	}
+
+	//if originalVal.Kind() != reflect.Ptr || originalVal.Elem().Kind() != reflect.Struct {
+	//	return original
+	//}
 	copyVal := reflect.New(originalVal.Type()).Elem()
 
 	for i := 0; i < originalVal.NumField(); i++ {
@@ -53,7 +68,7 @@ func cleanStruct(val reflect.Value) (z interface{}) {
 
 }
 
-func cleanMap(m reflect.Value) (z interface{}) {
+func cleanMap(m reflect.Value, cache Cache) (z interface{}) {
 
 	// TODO: if keys to map are not strings, then create a slice/array of Key/Value Structs
 	//type KeyValuePair struct {
@@ -67,21 +82,21 @@ func cleanMap(m reflect.Value) (z interface{}) {
 	for _, k := range keys {
 		if k.CanInterface() { // only do exported fields b/c json marhshal can only do that
 			val := m.MapIndex(k)
-			ret[k] = cleanUp(val)
+			ret[k] = cleanUp(val, cache)
 		}
 	}
 
 	return ret
 }
 
-func cleanList(m reflect.Value) (z interface{}) {
+func cleanList(m reflect.Value, cache Cache) (z interface{}) {
 
 	var ret = []interface{}{}
 
 	for i := 0; i < m.Len(); i++ {
 		// Get the element at index i
 		element := m.Index(i)
-		ret = append(ret, cleanUp(element))
+		ret = append(ret, cleanUp(element, cache))
 	}
 
 	return ret
@@ -99,7 +114,7 @@ func isNonComplexNum(kind reflect.Kind) bool {
 		kind == reflect.Uint64
 }
 
-func cleanUp(v interface{}) (z interface{}) {
+func cleanUp(v interface{}, cache *map[*interface{}]string) (z interface{}) {
 
 	// TODO: this is not really working
 
@@ -130,7 +145,7 @@ func cleanUp(v interface{}) (z interface{}) {
 
 	*/
 
-	val := reflect.ValueOf(v)
+	val := reflect.ValueOf(&v)
 	kind := val.Kind()
 
 	if kind == reflect.Pointer {
@@ -140,6 +155,8 @@ func cleanUp(v interface{}) (z interface{}) {
 		val = val.Elem()
 		kind = val.Kind()
 	}
+
+	fmt.Println("here 1")
 
 	if kind == reflect.Bool {
 		return v
@@ -173,8 +190,17 @@ func cleanUp(v interface{}) (z interface{}) {
 		return "(go:UnsafePointer)"
 	}
 
+	fmt.Println("here 2")
+
 	if kind == reflect.Struct {
-		return cleanStruct(val)
+		//panic("here")
+		return copyStruct(v, cache)
+		//return cleanStruct(val)
+	}
+
+	if kind == reflect.Interface {
+		return copyStruct(v, cache)
+		//return cleanStruct(val)
 	}
 
 	if kind == reflect.Map {
@@ -183,16 +209,18 @@ func cleanUp(v interface{}) (z interface{}) {
 		//	Key   int    `json:"key"`
 		//	Value string `json:"value"`
 		//}
-		return cleanMap(val)
+		return cleanMap(val, cache)
 	}
 
 	if kind == reflect.Slice {
-		return cleanList(val)
+		return cleanList(val, cache)
 	}
 
 	if kind == reflect.Array {
-		return cleanList(val)
+		return cleanList(val, cache)
 	}
 
+	fmt.Println("here 3")
+	fmt.Println("kind:", kind.String())
 	return fmt.Sprintf("%+v", v)
 }

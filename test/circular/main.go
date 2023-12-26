@@ -9,7 +9,7 @@ func main() {
 		Z interface{}
 	}{}
 
-	z.Z = z
+	z.Z = &z
 
 	jlog.DefaultLogger.Info(z)
 }
