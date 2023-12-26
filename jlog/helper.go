@@ -313,6 +313,10 @@ func getFuncSignature(v interface{}) string {
 
 var mutex sync.Mutex
 
+func getFormattedNilStr(str string) string {
+	return aurora.Black(aurora.Bold("<nil>")).String()
+}
+
 func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) (s string) {
 
 	defer func() {
@@ -339,10 +343,19 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 		return "<nil-2>"
 	}
 
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Ptr && rv.IsNil() {
+		return fmt.Sprintf("<nil> (%v)", rv.Type())
+	}
+
 	val := reflect.ValueOf(&v)
 
 	if !val.IsValid() {
-		return fmt.Sprintf("(%s <nil-11>)", reflect.TypeOf(v).Kind().String())
+		return fmt.Sprintf("<nil-11> (%s)", reflect.TypeOf(v).Kind().String())
+	}
+
+	if val.Kind() == reflect.Ptr && val.IsNil() {
+		return fmt.Sprintf("<nil-111> (%v)", val.Type())
 	}
 
 	originalV := v
@@ -379,7 +392,7 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 		//val = reflect.ValueOf(v)
 
 		if val.IsNil() {
-			return "<nil-pointer>"
+			return "<nil-44>"
 		}
 
 		val = val.Elem()
@@ -390,10 +403,6 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 				return "<nil-12>"
 			}
 
-			if &v == nil {
-				return "<nil-18>"
-			}
-
 			val = reflect.ValueOf(v)
 			kind = val.Kind()
 
@@ -402,25 +411,35 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 		}
 	}
 
-	if v == reflect.Ptr {
+	if kind == reflect.Ptr {
 		// Dereference the pointer
-
-		elem := val.Elem()
+		val = reflect.ValueOf(v)
+		kind = val.Kind()
+		val = val.Elem()
 		// Convert the dereferenced value to a string
-		if elem.IsValid() {
-			return fmt.Sprintf("%v", elem.Interface())
-		} else {
-			return "<nil-99>"
-		}
+		//if !elem.IsValid() {
+		//	return fmt.Sprintf("%v", elem.Interface())
+		//} else {
+		//	return "<nil-99>"
+		//}
+		//if !val.IsValid() {
+		//	return "<nil-99>"
+		//}
+
+		//if !val.IsValid() {
+		//	return fmt.Sprintf("%v", val.Interface())
+		//} else {
+		//	return "<nil-94>"
+		//}
 	}
 
 	if v == nil {
 		return "<nil-13>"
 	}
 
-	rv := reflect.ValueOf(v)
-	if rv.Kind() == reflect.Ptr && rv.IsNil() {
-		return fmt.Sprintf("<nil> (%v)", rv.Type())
+	rfx := reflect.ValueOf(v)
+	if rfx.Kind() == reflect.Ptr && rfx.IsNil() {
+		return fmt.Sprintf("<nil> (%v)", reflect.TypeOf(v).String())
 	}
 
 	if kind == reflect.Chan {
