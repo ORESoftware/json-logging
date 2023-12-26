@@ -7,6 +7,24 @@ import (
 	"unsafe"
 )
 
+func copyStruct(original interface{}) interface{} {
+	originalVal := reflect.ValueOf(original)
+
+	if originalVal.Kind() != reflect.Ptr || originalVal.Elem().Kind() != reflect.Struct {
+		return original
+	}
+	originalVal = originalVal.Elem()
+	copyVal := reflect.New(originalVal.Type()).Elem()
+
+	for i := 0; i < originalVal.NumField(); i++ {
+		if originalVal.Field(i).CanInterface() { //only copy uppercase/expore
+			copyVal.Field(i).Set(originalVal.Field(i))
+		}
+	}
+
+	return copyVal.Addr().Interface()
+}
+
 func cleanStruct(val reflect.Value) (z interface{}) {
 
 	n := val.NumField()
@@ -47,8 +65,23 @@ func cleanMap(m reflect.Value) (z interface{}) {
 	keys := m.MapKeys()
 
 	for _, k := range keys {
-		val := m.MapIndex(k)
-		ret[k] = cleanUp(val)
+		if k.CanInterface() { // only do exported fields b/c json marhshal can only do that
+			val := m.MapIndex(k)
+			ret[k] = cleanUp(val)
+		}
+	}
+
+	return ret
+}
+
+func cleanList(m reflect.Value) (z interface{}) {
+
+	var ret = []interface{}{}
+
+	for i := 0; i < m.Len(); i++ {
+		// Get the element at index i
+		element := m.Index(i)
+		ret = append(ret, cleanUp(element))
 	}
 
 	return ret
@@ -100,6 +133,14 @@ func cleanUp(v interface{}) (z interface{}) {
 	val := reflect.ValueOf(v)
 	kind := val.Kind()
 
+	if kind == reflect.Pointer {
+		val = val.Elem()
+		kind = val.Kind()
+	} else if kind == reflect.Ptr {
+		val = val.Elem()
+		kind = val.Kind()
+	}
+
 	if kind == reflect.Bool {
 		return v
 	}
@@ -129,7 +170,7 @@ func cleanUp(v interface{}) (z interface{}) {
 	}
 
 	if kind == reflect.UnsafePointer {
-		return "(go:unsafePointer)"
+		return "(go:UnsafePointer)"
 	}
 
 	if kind == reflect.Struct {
@@ -145,5 +186,13 @@ func cleanUp(v interface{}) (z interface{}) {
 		return cleanMap(val)
 	}
 
-	return v
+	if kind == reflect.Slice {
+		return cleanList(val)
+	}
+
+	if kind == reflect.Array {
+		return cleanList(val)
+	}
+
+	return fmt.Sprintf("%+v", v)
 }

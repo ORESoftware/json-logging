@@ -23,6 +23,12 @@ import (
 var isTerminal = terminal.IsTerminal(int(os.Stdout.Fd()))
 var pid = os.Getpid()
 
+func WriteToStderr(args ...interface{}) {
+	if _, err := fmt.Fprintln(os.Stderr, args...); err != nil {
+		fmt.Println("adcca45f-8d7b-4d4a-8fd2-7683b7b375b5", "could not write to stderr:", err)
+	}
+}
+
 var m1 = sync.Mutex{}
 
 var safeStdout = writer.NewSafeWriter(os.Stdout)
@@ -61,7 +67,6 @@ func New(AppName string, forceJSON bool, hostName string) *Logger {
 		if hostName == "" {
 			hn, err := os.Hostname()
 			if err != nil {
-				DefaultLogger.Warn("Could not grab hostname from env.")
 				hostName = "unknown_hostname"
 			} else {
 				hostName = hn
@@ -83,37 +88,22 @@ func New(AppName string, forceJSON bool, hostName string) *Logger {
 		isLoggingJson = true
 	}
 
+	var metaFields = MP(
+		"git_commit", os.Getenv("vibe_git_commit"),
+		"git_repo", os.Getenv("vibe_git_repo"),
+	)
+
 	return &Logger{
 		//IsLoggingJSON: !isTerminal && !forceJSON,
 		IsLoggingJSON: isLoggingJson,
 		AppName:       AppName,
 		HostName:      hostName,
+		MetaFields:    metaFields,
 	}
 }
 
 func NewLogger(AppName string, forceJSON bool, hostName string) *Logger {
-
-	if hostName == "" {
-
-		hn, err := os.Hostname()
-
-		if err != nil {
-			DefaultLogger.Warn("Could not grab hostname from env.")
-			hostName = "unknown_hostname"
-		} else {
-			hostName = hn
-		}
-
-	}
-
-	return &Logger{
-		IsLoggingJSON: !isTerminal && !forceJSON,
-		AppName:       AppName,
-		HostName:      hostName,
-		MetaFields: NewMetaFields(
-			&map[string]interface{}{},
-		),
-	}
+	return New(AppName, forceJSON, hostName)
 }
 
 type KV struct {
@@ -173,6 +163,26 @@ func NewMetaFields(m *map[string]interface{}) *MetaFields {
 		UniqueMarker:     "UniqueMarker(Brand)",
 		m:                m,
 	}
+}
+
+type logIdMarker struct{}
+
+var myLogIdMarker = &logIdMarker{}
+
+type LogId struct {
+	*logIdMarker
+	val string
+}
+
+func (x *LogId) IsLogId() bool {
+	return true
+}
+
+func Id(v string) *LogId {
+	return &LogId{myLogIdMarker, v}
+}
+func (l *Logger) Id(v string) *LogId {
+	return Id(v)
 }
 
 func (l *Logger) NewLoggerWithLock() (*Logger, func()) {
@@ -248,6 +258,10 @@ func (l *Logger) Child(m *map[string]interface{}) *Logger {
 	}
 }
 
+type SprintFStruct struct {
+	SprintF string
+}
+
 func (l *Logger) Create(m *map[string]interface{}) *Logger {
 
 	var z = make(map[string]interface{})
@@ -263,7 +277,7 @@ func (l *Logger) Create(m *map[string]interface{}) *Logger {
 	}
 }
 
-func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
+func (l *Logger) writePretty(level string, m *MetaStruct, args *[]interface{}) {
 
 	date := time.Now().UTC().String()[11:25] // only first 25 chars
 	stylizedLevel := level
@@ -376,39 +390,35 @@ func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 			size = size + len(s)
 		}
 
-		if _, err := safeStdout.Write([]byte(s)); err != nil {
-			fmt.Fprintln(os.Stderr, "771c710b-aba2-46ef-9126-c26d3dfe7925", err)
+		if _, err := safeStdout.WriteString(s); err != nil {
+			WriteToStderr("771c710b-aba2-46ef-9126-c26d3dfe7925", err)
 		}
 
-		if !primitive {
+		if !primitive && (level == "TRACE" || level == "DEBUG") {
 
-			if _, err := safeStdout.Write([]byte("\n")); err != nil {
-				fmt.Fprintln(os.Stderr, "18614292-658f-42a5-81e7-593e941ea857", err)
+			if _, err := safeStdout.WriteString("\n"); err != nil {
+				WriteToStderr("18614292-658f-42a5-81e7-593e941ea857", err)
 			}
 
-			safeStdout.WriteString("\n")
-			zz := fmt.Sprintf("sprintf: %+v", v)
-			if _, err := safeStdout.WriteString(zz); err != nil {
-				fmt.Fprintln(os.Stderr, "2a795ef2-65bb-4a03-9808-b072e4497d73", err)
+			if _, err := safeStdout.WriteString(fmt.Sprintf("sprintf: %+v", v)); err != nil {
+				WriteToStderr("2a795ef2-65bb-4a03-9808-b072e4497d73", err)
 			}
 
-			safeStdout.WriteString("\n")
-
-			//safeStdout.Write([]byte("json:"))
-			//if x, err := json.Marshal(v); err == nil {
-			//	if _, err := safeStdout.Write([]byte(x)); err != nil {
-			//		fmt.Println("err1:", err)
-			//	}
-			//} else {
-			//	fmt.Println("err2:", err)
-			//}
+			safeStdout.Write([]byte("json:"))
+			if x, err := json.Marshal(v); err == nil {
+				if _, err := safeStdout.Write(x); err != nil {
+					WriteToStderr("err:56831878-8d63-45f4-905b-d1b3bbac2152:", err)
+				}
+			} else {
+				WriteToStderr("err:70bf10e0-6e69-4a3b-bf64-08f6d20c4580:", err)
+			}
 
 		}
 
 	}
 
 	if _, err := safeStdout.WriteString("\n"); err != nil {
-		fmt.Fprintln(os.Stderr, "f834d14a-9735-4fd6-9389-f79144044746", err)
+		WriteToStderr("f834d14a-9735-4fd6-9389-f79144044746", err)
 	}
 }
 
@@ -422,12 +432,12 @@ func isNonPrimitive(kind reflect.Kind) bool {
 		kind == reflect.Interface
 }
 
-func (l *Logger) writeJSONFromFormattedStr(level string, m *MetaFields, s *[]interface{}) {
+func (l *Logger) writeJSONFromFormattedStr(level string, m *MetaStruct, s *[]interface{}) {
 
 	date := time.Now().UTC().String()
 	date = date[:26]
 
-	buf, err := json.Marshal([8]interface{}{"@bunion", l.AppName, level, pid, l.HostName, date, m, s})
+	buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, level, pid, l.HostName, date, m, s})
 
 	if err != nil {
 		DefaultLogger.Warn(err)
@@ -438,12 +448,12 @@ func (l *Logger) writeJSONFromFormattedStr(level string, m *MetaFields, s *[]int
 
 }
 
-func (l *Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
+func (l *Logger) writeJSON(level string, m *MetaStruct, args *[]interface{}) {
 
 	date := time.Now().UTC().String()
 	date = date[:26]
 
-	buf, err := json.Marshal([8]interface{}{"@bunion", l.AppName, level, pid, l.HostName, date, m, args})
+	buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, level, pid, l.HostName, date, m, args})
 
 	if err != nil {
 
@@ -457,10 +467,10 @@ func (l *Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 
 		for i := 0; i < len(*args); i++ {
 			// TODO: for now instead of cleanUp, we can ust fmt.Sprintf()
-			cleaned = append(cleaned, cleanUp((*args)[i]))
+			cleaned = append(cleaned, cleanUp(&(*args)[i]))
 		}
 
-		buf, err = json.Marshal([8]interface{}{"@bunion", l.AppName, level, pid, l.HostName, date, m, cleaned})
+		buf, err = json.Marshal([8]interface{}{"@bunion:v1", l.AppName, level, pid, l.HostName, date, m, cleaned})
 
 		if err != nil {
 			fmt.Println(errors.New("Json-Logging: could not marshal the slice: " + err.Error()))
@@ -474,7 +484,7 @@ func (l *Logger) writeJSON(level string, m *MetaFields, args *[]interface{}) {
 	m1.Unlock()
 }
 
-func (l *Logger) writeSwitchForFormattedString(level string, m *MetaFields, s *[]interface{}) {
+func (l *Logger) writeSwitchForFormattedString(level string, m *MetaStruct, s *[]interface{}) {
 	if l.IsLoggingJSON {
 		l.writeJSONFromFormattedStr(level, m, s)
 	} else {
@@ -482,7 +492,7 @@ func (l *Logger) writeSwitchForFormattedString(level string, m *MetaFields, s *[
 	}
 }
 
-func (l *Logger) writeSwitch(level string, m *MetaFields, args *[]interface{}) {
+func (l *Logger) writeSwitch(level string, m *MetaStruct, args *[]interface{}) {
 	if l.IsLoggingJSON {
 		l.writeJSON(level, m, args)
 	} else {
@@ -538,30 +548,74 @@ func (l *Logger) RawJSON(args ...interface{}) {
 	}
 }
 
+type MetaStruct struct {
+	Default []interface{}
+	Custom  []interface{}
+}
+
+func (l *Logger) getMetaFields(args *[]interface{}) (*MetaStruct, []interface{}) {
+	var newArgs = []interface{}{}
+	var meta = &MetaStruct{
+		Default: make([]interface{}, 0),
+		Custom:  make([]interface{}, 0),
+	}
+	if os.Getenv("vibe_in_prod") != "yes" {
+		meta.Default = append(meta.Default, l.MetaFields.m)
+	}
+
+	for _, x := range *args {
+		if z, ok := x.(MetaFields); ok {
+			meta.Custom = append(meta.Custom, z.m)
+		} else if z, ok := x.(*LogId); ok {
+			meta.Custom = append(meta.Custom, struct {
+				LogId string
+			}{z.val})
+			newArgs = append(newArgs, z.val)
+		} else if z, ok := x.(LogId); ok {
+			meta.Custom = append(meta.Custom, struct {
+				LogId string
+			}{z.val})
+			newArgs = append(newArgs, z.val)
+		} else {
+			newArgs = append(newArgs, x)
+		}
+	}
+	if len(meta.Custom) < 1 && len(meta.Default) < 1 {
+		meta = nil
+	}
+	return meta, newArgs
+}
+
 func (l *Logger) Info(args ...interface{}) {
-	l.writeSwitch("INFO", nil, &args)
+	var meta, newArgs = l.getMetaFields(&args)
+	l.writeSwitch("INFO", meta, &newArgs)
 }
 
 func (l *Logger) Warn(args ...interface{}) {
-	l.writeSwitch("WARN", nil, &args)
+	var meta, newArgs = l.getMetaFields(&args)
+	l.writeSwitch("WARN", meta, &newArgs)
 }
 
 func (l *Logger) Warning(args ...interface{}) {
-	l.writeSwitch("WARN", nil, &args)
+	var meta, newArgs = l.getMetaFields(&args)
+	l.writeSwitch("WARN", meta, &newArgs)
 }
 
 func (l *Logger) Error(args ...interface{}) {
+	var meta, newArgs = l.getMetaFields(&args)
 	filteredStackTrace := getFilteredStacktrace()
-	args = append(args, StackTrace{filteredStackTrace})
-	l.writeSwitch("ERROR", nil, &args)
+	newArgs = append(newArgs, StackTrace{filteredStackTrace})
+	l.writeSwitch("ERROR", meta, &newArgs)
 }
 
 func (l *Logger) Debug(args ...interface{}) {
-	l.writeSwitch("DEBUG", nil, &args)
+	var meta, newArgs = l.getMetaFields(&args)
+	l.writeSwitch("DEBUG", meta, &newArgs)
 }
 
 func (l *Logger) Trace(args ...interface{}) {
-	l.writeSwitch("TRACE", nil, &args)
+	var meta, newArgs = l.getMetaFields(&args)
+	l.writeSwitch("TRACE", meta, &newArgs)
 }
 
 type errorIdMarker struct{}
@@ -638,12 +692,9 @@ func MP(
 
 	return NewMetaFields(&m)
 
-	//return metaFields{
-	//	Meta: m,
-	//}
 }
 
-func getFilteredStacktrace() string {
+func getFilteredStacktrace() *[]string {
 	// Capture the stack trace
 	buf := make([]byte, 1024)
 	n := runtime.Stack(buf, false)
@@ -651,14 +702,14 @@ func getFilteredStacktrace() string {
 
 	// Filter the stack trace
 	lines := strings.Split(stackTrace, "\n")
-	var filteredLines = []string{""}
+	var filteredLines = []string{}
 	for _, line := range lines {
 		if !strings.Contains(line, "oresoftware/json-logging") {
-			filteredLines = append(filteredLines, fmt.Sprintf("\t%s", strings.TrimSpace(line)))
+			filteredLines = append(filteredLines, fmt.Sprintf("%s", strings.TrimSpace(line)))
 		}
 	}
 
-	return strings.Join(filteredLines, "\n")
+	return &filteredLines
 }
 
 func (l *Logger) TagPair(k string, v interface{}) *Logger {
@@ -683,7 +734,7 @@ func (l *Logger) WarningF(s string, args ...interface{}) {
 }
 
 type StackTrace struct {
-	Trace string
+	Trace *[]string
 }
 
 func (l *Logger) ErrorF(s string, args ...interface{}) {
@@ -732,11 +783,11 @@ func (l *Logger) PlainStderr(args ...interface{}) {
 	safeStderr.Unlock()
 }
 
-var DefaultLogger = Logger{
-	AppName:       "Default",
-	IsLoggingJSON: !isTerminal,
-	HostName:      os.Getenv("HOSTNAME"),
-}
+var DefaultLogger = NewLogger(
+	"Default",
+	false,
+	"<hostname>",
+)
 
 func init() {
 
