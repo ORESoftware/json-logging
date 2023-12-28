@@ -9,7 +9,7 @@ import (
 
 type Cache = *map[*interface{}]string
 
-func copyStruct(original interface{}, cache Cache) interface{} {
+func copyStruct_Old(original interface{}, cache Cache) interface{} {
 	originalVal := reflect.ValueOf(original)
 	originalValElem := originalVal.Elem()
 	originalValIntf := originalValElem.Interface()
@@ -40,7 +40,79 @@ func copyStruct(original interface{}, cache Cache) interface{} {
 	return copyVal.Addr().Interface()
 }
 
-func cleanStruct(val reflect.Value) (z interface{}) {
+func cleanStruct(val reflect.Value, cache Cache) interface{} {
+
+	//if val.Kind() != reflect.Struct {
+	//	panic("cleanStruct only accepts structs")
+	//}
+
+	// Create a new struct of the same type
+	newStruct := reflect.New(val.Type()).Elem()
+
+	// Iterate over each field and copy
+	for i := 0; i < val.NumField(); i++ {
+		fieldVal := val.Field(i)
+
+		// Check if field is a pointer
+		if fieldVal.Kind() == reflect.Ptr {
+			if !fieldVal.IsNil() {
+				// Create a new instance of the type that the pointer points to
+				newPtr := reflect.New(fieldVal.Elem().Type())
+
+				// Recursively copy the value and get a reflect.Value
+				copiedVal := reflect.ValueOf(cleanStruct(fieldVal.Elem(), cache))
+
+				// Set the copied value to the new pointer
+				newPtr.Elem().Set(copiedVal)
+
+				// Set the new pointer to the field
+				newStruct.Field(i).Set(newPtr)
+			}
+		} else if fieldVal.CanSet() {
+			// For non-pointer fields, just copy the value
+			newStruct.Field(i).Set(fieldVal)
+		}
+	}
+
+	return newStruct.Interface()
+}
+
+func cleanStructNew(val reflect.Value, cache Cache) interface{} {
+
+	// we turn struct into a map so we can display
+	var ret = map[interface{}]interface{}{}
+
+	// Iterate over each field and copy
+	for i := 0; i < val.NumField(); i++ {
+		fieldVal := val.Field(i)
+		fieldType := val.Type()     // Get the reflect.Type of the struct
+		field := fieldType.Field(i) // Get the reflect.StructField
+
+		if fieldVal.Kind() == reflect.Ptr {
+			if !fieldVal.IsNil() {
+				// Create a new instance of the type that the pointer points to
+				newPtr := reflect.New(fieldVal.Elem().Type())
+
+				// Recursively copy the value and get a reflect.Value
+				copiedVal := reflect.ValueOf(cleanStruct(fieldVal.Elem(), cache))
+
+				// Set the copied value to the new pointer
+				newPtr.Elem().Set(copiedVal)
+
+				//// Set the new pointer to the field
+				//newStruct.Field(i).Set(newPtr)
+				ret[field.Name] = cleanUp(newPtr, cache)
+			}
+		} else {
+			ret[field.Name] = cleanUp(fieldVal, cache)
+		}
+
+	}
+
+	return ret
+}
+
+func cleanStructOld(val reflect.Value) (z interface{}) {
 
 	n := val.NumField()
 	t := val.Type()
@@ -80,10 +152,8 @@ func cleanMap(m reflect.Value, cache Cache) (z interface{}) {
 	keys := m.MapKeys()
 
 	for _, k := range keys {
-		if k.CanInterface() { // only do exported fields b/c json marhshal can only do that
-			val := m.MapIndex(k)
-			ret[k] = cleanUp(val, cache)
-		}
+		val := m.MapIndex(k)
+		ret[k] = cleanUp(val, cache)
 	}
 
 	return ret
@@ -148,15 +218,51 @@ func cleanUp(v interface{}, cache *map[*interface{}]string) (z interface{}) {
 	val := reflect.ValueOf(&v)
 	kind := val.Kind()
 
-	if kind == reflect.Pointer {
+	if kind == reflect.Pointer || kind == reflect.Interface {
 		val = val.Elem()
 		kind = val.Kind()
-	} else if kind == reflect.Ptr {
-		val = val.Elem()
-		kind = val.Kind()
+		v = val.Interface()
 	}
 
-	fmt.Println("here 1")
+	if kind == reflect.Pointer || kind == reflect.Interface {
+		val = val.Elem()
+		kind = val.Kind()
+		v = val.Interface()
+	}
+
+	if kind == reflect.Pointer || kind == reflect.Interface {
+		val = val.Elem()
+		kind = val.Kind()
+		v = val.Interface()
+	}
+
+	if v == nil {
+		return fmt.Sprintf("<nil> (%T)", v)
+	}
+
+	if val.Kind() == reflect.Interface {
+		// Use Elem() to get the underlying type
+
+		val = val.Elem()
+		kind = val.Kind()
+		v = val.Interface()
+
+		// Check again if the concrete value is also an interface
+		if val.Kind() == reflect.Interface {
+			// Get type information about the interface
+			typ := val.Type()
+
+			// You can also check if the interface is nil
+			if val.IsNil() {
+				return fmt.Sprintf("Nested interface type: %v, but it is nil", typ)
+			} else {
+				// Get more information about the non-nil interface
+				concreteVal := val.Elem()
+				concreteType := concreteVal.Type()
+				return fmt.Sprintf("Nested interface type: %v, contains value of type: %v", typ, concreteType)
+			}
+		}
+	}
 
 	if kind == reflect.Bool {
 		return v
@@ -190,17 +296,24 @@ func cleanUp(v interface{}, cache *map[*interface{}]string) (z interface{}) {
 		return "(go:UnsafePointer)"
 	}
 
-	fmt.Println("here 2")
+	if kind == reflect.Interface {
+		//return copyStruct(v, cache)
+		//actualValue := val.Elem()
+		//t := actualValue.Type(
+		return "inf Interface type"
+	}
 
 	if kind == reflect.Struct {
 		//panic("here")
-		return copyStruct(v, cache)
-		//return cleanStruct(val)
-	}
-
-	if kind == reflect.Interface {
-		return copyStruct(v, cache)
-		//return cleanStruct(val)
+		//return copyStruct(v, cache)
+		//actualValue := val.Elem()
+		//t := actualValue.Type()
+		//if t.Kind() != reflect.Interface {
+		//	intf := actualValue.Interface()
+		//	return cleanUp(intf, cache)
+		//}
+		//fmt.Println(val)
+		return cleanStruct(val, cache)
 	}
 
 	if kind == reflect.Map {
@@ -222,5 +335,14 @@ func cleanUp(v interface{}, cache *map[*interface{}]string) (z interface{}) {
 
 	fmt.Println("here 3")
 	fmt.Println("kind:", kind.String())
-	return fmt.Sprintf("%+v", v)
+
+	if z, ok := v.(Stringer); ok {
+		return z.String()
+	}
+
+	if z, ok := v.(ToString); ok {
+		return z.ToString()
+	}
+
+	return fmt.Sprintf("unknown type: %v", v)
 }

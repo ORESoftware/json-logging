@@ -42,7 +42,7 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, ca
 		//	getStringRepresentation(val.Interface(), nil, size, brk, depth+1, cache) +
 		//	addComma(i, n)
 
-		z := fmt.Sprintf("%v", k.Interface()) + " —> " + fmt.Sprintf("%v", val.Interface()) + addComma(i, n)
+		z := fmt.Sprintf("'%v'", k.Interface()) + aurora.Bold(" —> ").String() + fmt.Sprintf("%v", val.Interface()) + addComma(i, n)
 		size = size + len(z)
 		values = append(values, z)
 	}
