@@ -508,8 +508,7 @@ func (l *Logger) writeJSON(level string, mf *MetaFields, args *[]interface{}) {
 		for i := 0; i < len(*args); i++ {
 			// TODO: for now instead of cleanUp, we can ust fmt.Sprintf()
 			v := &(*args)[i]
-			val := reflect.ValueOf(v)
-			c := cleanUp(val, v, &cache)
+			c := cleanUp(v, &cache)
 			debug.PrintStack()
 			cleaned = append(cleaned, c)
 		}
