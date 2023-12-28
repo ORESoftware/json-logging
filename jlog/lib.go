@@ -44,7 +44,7 @@ type Logger struct {
 	ForceJSON     bool
 	ForceNonJSON  bool
 	TimeZone      string
-	MetaFields    MetaFields
+	MetaFields    *MetaFields
 	LockUuid      string
 	EnvPrefix     string
 }
@@ -126,7 +126,7 @@ func NewLogger(p LoggerParams) *Logger {
 		ForceJSON:     p.ForceJSON,
 		ForceNonJSON:  p.ForceNonJSON,
 		TimeZone:      p.TimeZone,
-		MetaFields:    *metaFields,
+		MetaFields:    metaFields,
 		LockUuid:      p.LockUuid,
 		EnvPrefix:     p.EnvPrefix,
 	}
@@ -293,7 +293,7 @@ func (l *Logger) Child(m *map[string]interface{}) *Logger {
 		IsLoggingJSON: l.IsLoggingJSON,
 		AppName:       l.AppName,
 		HostName:      l.HostName,
-		MetaFields:    *NewMetaFields(&z),
+		MetaFields:    NewMetaFields(&z),
 	}
 }
 
@@ -312,7 +312,7 @@ func (l *Logger) Create(m *map[string]interface{}) *Logger {
 		IsLoggingJSON: l.IsLoggingJSON,
 		AppName:       l.AppName,
 		HostName:      l.HostName,
-		MetaFields:    *NewMetaFields(&z),
+		MetaFields:    NewMetaFields(&z),
 	}
 }
 
@@ -502,12 +502,14 @@ func (l *Logger) writeJSON(level string, mf *MetaFields, args *[]interface{}) {
 
 		//cleaned := make([]interface{},0)
 
-		var cache = map[*interface{}]string{}
+		var cache = map[*interface{}]*interface{}{}
 		var cleaned = make([]interface{}, 0)
 
 		for i := 0; i < len(*args); i++ {
 			// TODO: for now instead of cleanUp, we can ust fmt.Sprintf()
-			c := cleanUp(&(*args)[i], &cache)
+			v := &(*args)[i]
+			val := reflect.ValueOf(v)
+			c := cleanUp(val, v, &cache)
 			debug.PrintStack()
 			cleaned = append(cleaned, c)
 		}
@@ -769,7 +771,7 @@ func (l *Logger) WarningF(s string, args ...interface{}) {
 }
 
 type StackTrace struct {
-	Trace *[]string
+	ErrorTrace *[]string
 }
 
 func (l *Logger) ErrorF(s string, args ...interface{}) {

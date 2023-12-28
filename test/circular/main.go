@@ -24,5 +24,6 @@ func main() {
 	m := M{}
 	m.Z.Z.Z = &m
 
-	log.Info(m)
+	//log.Info(m)
+	log.Error(m)
 }

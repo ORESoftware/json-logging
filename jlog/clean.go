@@ -7,7 +7,7 @@ import (
 	"unsafe"
 )
 
-type Cache = *map[*interface{}]string
+type Cache = *map[*interface{}]*interface{}
 
 func copyStruct_Old(original interface{}, cache Cache) interface{} {
 	originalVal := reflect.ValueOf(original)
@@ -40,7 +40,7 @@ func copyStruct_Old(original interface{}, cache Cache) interface{} {
 	return copyVal.Addr().Interface()
 }
 
-func cleanStruct(val reflect.Value, cache Cache) interface{} {
+func cleanStructWorks(val reflect.Value, cache Cache) interface{} {
 
 	//if val.Kind() != reflect.Struct {
 	//	panic("cleanStruct only accepts structs")
@@ -60,13 +60,17 @@ func cleanStruct(val reflect.Value, cache Cache) interface{} {
 				newPtr := reflect.New(fieldVal.Elem().Type())
 
 				// Recursively copy the value and get a reflect.Value
-				copiedVal := reflect.ValueOf(cleanStruct(fieldVal.Elem(), cache))
+				elem := fieldVal.Elem()
+				if elem.CanInterface() {
+					copiedVal := reflect.ValueOf(cleanUp(fieldVal, newPtr, cache))
 
-				// Set the copied value to the new pointer
-				newPtr.Elem().Set(copiedVal)
+					// Set the copied value to the new pointer
+					newPtr.Elem().Set(copiedVal)
 
-				// Set the new pointer to the field
-				newStruct.Field(i).Set(newPtr)
+					// Set the new pointer to the field
+					newStruct.Field(i).Set(newPtr)
+				}
+
 			}
 		} else if fieldVal.CanSet() {
 			// For non-pointer fields, just copy the value
@@ -77,34 +81,43 @@ func cleanStruct(val reflect.Value, cache Cache) interface{} {
 	return newStruct.Interface()
 }
 
-func cleanStructNew(val reflect.Value, cache Cache) interface{} {
+func cleanStruct(val reflect.Value, v interface{}, cache Cache) interface{} {
 
 	// we turn struct into a map so we can display
-	var ret = map[interface{}]interface{}{}
+	var ret = map[string]interface{}{}
 
 	// Iterate over each field and copy
 	for i := 0; i < val.NumField(); i++ {
 		fieldVal := val.Field(i)
 		fieldType := val.Type()     // Get the reflect.Type of the struct
 		field := fieldType.Field(i) // Get the reflect.StructField
+		itff := fieldVal.Interface()
 
-		if fieldVal.Kind() == reflect.Ptr {
+		if fieldVal.Kind() == reflect.Ptr || fieldVal.Kind() == reflect.Interface {
+
 			if !fieldVal.IsNil() {
+				//ret[field.Name] = "(pointer)"
+				//continue
 				// Create a new instance of the type that the pointer points to
 				newPtr := reflect.New(fieldVal.Elem().Type())
 
 				// Recursively copy the value and get a reflect.Value
-				copiedVal := reflect.ValueOf(cleanStruct(fieldVal.Elem(), cache))
+				copiedVal := reflect.ValueOf(cleanUp(fieldVal, itff, cache))
 
 				// Set the copied value to the new pointer
 				newPtr.Elem().Set(copiedVal)
 
 				//// Set the new pointer to the field
 				//newStruct.Field(i).Set(newPtr)
-				ret[field.Name] = cleanUp(newPtr, cache)
+				ret[field.Name] = cleanUp(copiedVal, newPtr, cache)
+			} else {
+				ret[field.Name] = "(nil pointer)"
 			}
+
 		} else {
-			ret[field.Name] = cleanUp(fieldVal, cache)
+
+			myCopy := itff
+			ret[field.Name] = cleanUp(fieldVal, myCopy, cache)
 		}
 
 	}
@@ -140,7 +153,7 @@ func cleanStructOld(val reflect.Value) (z interface{}) {
 
 }
 
-func cleanMap(m reflect.Value, cache Cache) (z interface{}) {
+func cleanMap(m reflect.Value, v interface{}, cache Cache) (z interface{}) {
 
 	// TODO: if keys to map are not strings, then create a slice/array of Key/Value Structs
 	//type KeyValuePair struct {
@@ -153,20 +166,21 @@ func cleanMap(m reflect.Value, cache Cache) (z interface{}) {
 
 	for _, k := range keys {
 		val := m.MapIndex(k)
-		ret[k] = cleanUp(val, cache)
+		inf := val.Interface()
+		ret[k] = cleanUp(val, inf, cache)
 	}
 
 	return ret
 }
 
-func cleanList(m reflect.Value, cache Cache) (z interface{}) {
+func cleanList(m reflect.Value, v interface{}, cache Cache) (z interface{}) {
 
 	var ret = []interface{}{}
 
 	for i := 0; i < m.Len(); i++ {
-		// Get the element at index i
 		element := m.Index(i)
-		ret = append(ret, cleanUp(element, cache))
+		inf := element.Interface()
+		ret = append(ret, cleanUp(element, inf, cache))
 	}
 
 	return ret
@@ -184,9 +198,17 @@ func isNonComplexNum(kind reflect.Kind) bool {
 		kind == reflect.Uint64
 }
 
-func cleanUp(v interface{}, cache *map[*interface{}]string) (z interface{}) {
+func cleanUp(val reflect.Value, v interface{}, cache Cache) (z interface{}) {
 
 	// TODO: this is not really working
+
+	originalV := v
+
+	if (*cache)[&v] != nil {
+		return fmt.Sprintf("pointer 1: %+v", v)
+	}
+
+	(*cache)[&v] = new(interface{})
 
 	// https://chat.openai.com/share/2113eb47-c685-48f1-81d1-96c4956f4ea5
 
@@ -215,8 +237,13 @@ func cleanUp(v interface{}, cache *map[*interface{}]string) (z interface{}) {
 
 	*/
 
-	val := reflect.ValueOf(&v)
 	kind := val.Kind()
+
+	//if kind == reflect.Pointer {
+	//	(*cache)[&v] = new(interface{})
+	//}
+
+	//originalV := v
 
 	if kind == reflect.Pointer || kind == reflect.Interface {
 		val = val.Elem()
@@ -262,6 +289,14 @@ func cleanUp(v interface{}, cache *map[*interface{}]string) (z interface{}) {
 				return fmt.Sprintf("Nested interface type: %v, contains value of type: %v", typ, concreteType)
 			}
 		}
+	}
+
+	if originalV != v && originalV != &v && &originalV != v && &originalV != &v {
+		if (*cache)[&v] != nil {
+			return fmt.Sprintf("pointer 2: %+v", v)
+		}
+
+		(*cache)[&v] = new(interface{})
 	}
 
 	if kind == reflect.Bool {
@@ -313,7 +348,7 @@ func cleanUp(v interface{}, cache *map[*interface{}]string) (z interface{}) {
 		//	return cleanUp(intf, cache)
 		//}
 		//fmt.Println(val)
-		return cleanStruct(val, cache)
+		return cleanStruct(val, v, cache)
 	}
 
 	if kind == reflect.Map {
@@ -322,19 +357,16 @@ func cleanUp(v interface{}, cache *map[*interface{}]string) (z interface{}) {
 		//	Key   int    `json:"key"`
 		//	Value string `json:"value"`
 		//}
-		return cleanMap(val, cache)
+		return cleanMap(val, v, cache)
 	}
 
 	if kind == reflect.Slice {
-		return cleanList(val, cache)
+		return cleanList(val, v, cache)
 	}
 
 	if kind == reflect.Array {
-		return cleanList(val, cache)
+		return cleanList(val, v, cache)
 	}
-
-	fmt.Println("here 3")
-	fmt.Println("kind:", kind.String())
 
 	if z, ok := v.(Stringer); ok {
 		return z.String()
