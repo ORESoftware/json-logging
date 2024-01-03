@@ -214,13 +214,6 @@ type ToString interface {
 	ToString() string
 }
 
-// TODO: use StringBuilder
-//var sb strings.Builder
-//sb.WriteString("Hello, ")
-//sb.WriteString(" years old.")
-//greeting := sb.String()
-// write direct to stdout using: sb.WriteTo(os.Stdout)
-
 func getFuncSignature(v interface{}) string {
 
 	funcValue := reflect.ValueOf(v)
