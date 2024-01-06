@@ -322,6 +322,38 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 		}
 	}()
 
+	if z, ok := v.(aurora.Value); ok && z != nil {
+		return z.String()
+	}
+
+	if z, ok := v.(*aurora.Value); ok && z != nil {
+		return (*z).String()
+	}
+
+	if z, ok := (*vv).(aurora.Value); ok && z != nil {
+		return (z).String()
+	}
+
+	if z, ok := (*vv).(*aurora.Value); ok && z != nil {
+		return (*z).String()
+	}
+
+	if z, ok := v.(Stringer); ok && z != nil {
+		return z.String()
+	}
+
+	if z, ok := v.(*Stringer); ok && z != nil {
+		return (*z).String()
+	}
+
+	if z, ok := (*vv).(Stringer); ok && z != nil {
+		return z.String()
+	}
+
+	if z, ok := (*vv).(*Stringer); ok && z != nil {
+		return (*z).String()
+	}
+
 	mutex.Lock()
 
 	if v, ok := (*cache)[vv]; ok {
