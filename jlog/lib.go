@@ -605,7 +605,10 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
 			for k, v := range *z.m {
 				m[k] = v
 			}
-
+		} else if z, ok := x.(*MetaFields); ok {
+			for k, v := range *z.m {
+				m[k] = v
+			}
 		} else if z, ok := x.(*LogId); ok {
 			m["LogId"] = z.val
 			newArgs = append(newArgs, z.val)
