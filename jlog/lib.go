@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -162,13 +163,45 @@ func NewLogger(p LoggerParams) *Logger {
 	}
 }
 
-func New(AppName string, forceJSON bool, hostName string, envTokenPrefix string, level LogLevel, files []*os.File) *Logger {
+func isSameFile(fd1, fd2 uintptr) (bool, error) {
+	var stat1, stat2 syscall.Stat_t
+	if err := syscall.Fstat(int(fd1), &stat1); err != nil {
+		return false, err
+	}
+	if err := syscall.Fstat(int(fd2), &stat2); err != nil {
+		return false, err
+	}
+	return stat1.Dev == stat2.Dev && stat1.Ino == stat2.Ino, nil
+}
+
+func checkIfSameFile() {
+	same, err := isSameFile(os.Stdout.Fd(), os.Stderr.Fd())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error checking file descriptors: %v\n", err)
+		os.Exit(1)
+	}
+	if same {
+		fmt.Println("os.Stdout and os.Stderr are directed to the same file/terminal")
+	} else {
+		fmt.Println("os.Stdout and os.Stderr are directed to different files/terminals")
+	}
+}
+
+func NewBasicLogger(AppName string, envTokenPrefix string, level LogLevel, files ...*os.File) *Logger {
 	return NewLogger(LoggerParams{
 		AppName:   AppName,
-		ForceJSON: forceJSON,
-		HostName:  hostName,
 		EnvPrefix: envTokenPrefix,
 		Files:     files,
+		LogLevel:  level,
+	})
+}
+
+func New(AppName string, envTokenPrefix string, level LogLevel, files []*os.File) *Logger {
+	return NewLogger(LoggerParams{
+		AppName:   AppName,
+		EnvPrefix: envTokenPrefix,
+		Files:     files,
+		LogLevel:  level,
 	})
 }
 
@@ -348,29 +381,30 @@ func (l *Logger) Create(m *map[string]interface{}) *Logger {
 	}
 }
 
-func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
+func (l *Logger) writePretty(level LogLevel, m *MetaFields, args *[]interface{}) {
 
 	date := time.Now().UTC().String()[11:25] // only first 25 chars
-	stylizedLevel := level
+	stylizedLevel := "<undefined>"
 
 	switch level {
-	case "ERROR":
+
+	case ERROR:
 		stylizedLevel = aurora.Underline(aurora.Bold(aurora.Red(level))).String()
 		break
 
-	case "WARN":
+	case WARN:
 		stylizedLevel = aurora.Magenta(level).String()
 		break
 
-	case "DEBUG":
+	case DEBUG:
 		stylizedLevel = aurora.Bold(level).String()
 		break
 
-	case "INFO":
+	case INFO:
 		stylizedLevel = aurora.Gray(12, level).String()
 		break
 
-	case "TRACE":
+	case TRACE:
 		stylizedLevel = aurora.Gray(4, level).String()
 		break
 	}
@@ -465,7 +499,7 @@ func (l *Logger) writePretty(level string, m *MetaFields, args *[]interface{}) {
 			WriteToStderr("771c710b-aba2-46ef-9126-c26d3dfe7925", err)
 		}
 
-		if !primitive && (level == "TRACE" || level == "DEBUG") {
+		if !primitive && (level == TRACE || level == DEBUG) {
 
 			if _, err := safeStdout.WriteString("\n"); err != nil {
 				WriteToStderr("18614292-658f-42a5-81e7-593e941ea857", err)
@@ -503,12 +537,21 @@ func isNonPrimitive(kind reflect.Kind) bool {
 		kind == reflect.Interface
 }
 
-func (l *Logger) writeJSONFromFormattedStr(level string, m *MetaFields, s *[]interface{}) {
+var levelToString = map[LogLevel]string{
+	TRACE: "TRACE",
+	DEBUG: "DEBUG",
+	WARN:  "WARN",
+	ERROR: "ERROR",
+	INFO:  "INFO",
+}
+
+func (l *Logger) writeJSONFromFormattedStr(level LogLevel, m *MetaFields, s *[]interface{}) {
 
 	date := time.Now().UTC().String()
 	date = date[:26]
+	var strLevel = levelToString[level]
 
-	buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, level, pid, l.HostName, date, m, s})
+	buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, m, s})
 
 	if err != nil {
 		DefaultLogger.Warn(err)
@@ -519,12 +562,13 @@ func (l *Logger) writeJSONFromFormattedStr(level string, m *MetaFields, s *[]int
 
 }
 
-func (l *Logger) writeJSON(level string, mf *MetaFields, args *[]interface{}) {
+func (l *Logger) writeJSON(level LogLevel, mf *MetaFields, args *[]interface{}) {
 
 	date := time.Now().UTC().String()
 	date = date[:26]
+	var strLevel = levelToString[level]
 
-	buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, level, pid, l.HostName, date, mf.m, args})
+	buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, mf.m, args})
 
 	if err != nil {
 
@@ -559,7 +603,7 @@ func (l *Logger) writeJSON(level string, mf *MetaFields, args *[]interface{}) {
 	m1.Unlock()
 }
 
-func (l *Logger) writeSwitchForFormattedString(level string, m *MetaFields, s *[]interface{}) {
+func (l *Logger) writeSwitchForFormattedString(level LogLevel, m *MetaFields, s *[]interface{}) {
 	if l.IsLoggingJSON {
 		l.writeJSONFromFormattedStr(level, m, s)
 	} else {
@@ -567,7 +611,7 @@ func (l *Logger) writeSwitchForFormattedString(level string, m *MetaFields, s *[
 	}
 }
 
-func (l *Logger) writeSwitch(level string, m *MetaFields, args *[]interface{}) {
+func (l *Logger) writeSwitch(level LogLevel, m *MetaFields, args *[]interface{}) {
 	if l.IsLoggingJSON {
 		l.writeJSON(level, m, args)
 	} else {
@@ -661,7 +705,7 @@ func (l *Logger) Info(args ...interface{}) {
 		return
 	}
 	var meta, newArgs = l.getMetaFields(&args)
-	l.writeSwitch("INFO", meta, &newArgs)
+	l.writeSwitch(INFO, meta, &newArgs)
 }
 
 func (l *Logger) Warn(args ...interface{}) {
@@ -670,23 +714,14 @@ func (l *Logger) Warn(args ...interface{}) {
 		return
 	}
 	var meta, newArgs = l.getMetaFields(&args)
-	l.writeSwitch("WARN", meta, &newArgs)
-}
-
-func (l *Logger) Warning(args ...interface{}) {
-	switch l.LogLevel {
-	case ERROR:
-		return
-	}
-	var meta, newArgs = l.getMetaFields(&args)
-	l.writeSwitch("WARN", meta, &newArgs)
+	l.writeSwitch(WARN, meta, &newArgs)
 }
 
 func (l *Logger) Error(args ...interface{}) {
 	var meta, newArgs = l.getMetaFields(&args)
 	filteredStackTrace := getFilteredStacktrace()
 	newArgs = append(newArgs, StackTrace{filteredStackTrace})
-	l.writeSwitch("ERROR", meta, &newArgs)
+	l.writeSwitch(ERROR, meta, &newArgs)
 }
 
 func (l *Logger) Debug(args ...interface{}) {
@@ -695,7 +730,7 @@ func (l *Logger) Debug(args ...interface{}) {
 		return
 	}
 	var meta, newArgs = l.getMetaFields(&args)
-	l.writeSwitch("DEBUG", meta, &newArgs)
+	l.writeSwitch(DEBUG, meta, &newArgs)
 }
 
 func (l *Logger) Trace(args ...interface{}) {
@@ -704,7 +739,7 @@ func (l *Logger) Trace(args ...interface{}) {
 		return
 	}
 	var meta, newArgs = l.getMetaFields(&args)
-	l.writeSwitch("TRACE", meta, &newArgs)
+	l.writeSwitch(TRACE, meta, &newArgs)
 }
 
 type errorIdMarker struct{}
@@ -817,7 +852,7 @@ func (l *Logger) InfoF(s string, args ...interface{}) {
 	case WARN, ERROR:
 		return
 	}
-	l.writeSwitchForFormattedString("INFO", nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitchForFormattedString(INFO, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) WarnF(s string, args ...interface{}) {
@@ -825,15 +860,7 @@ func (l *Logger) WarnF(s string, args ...interface{}) {
 	case ERROR:
 		return
 	}
-	l.writeSwitchForFormattedString("WARN", nil, &[]interface{}{fmt.Sprintf(s, args...)})
-}
-
-func (l *Logger) WarningF(s string, args ...interface{}) {
-	switch l.LogLevel {
-	case ERROR:
-		return
-	}
-	l.writeSwitchForFormattedString("WARN", nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitchForFormattedString(WARN, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 type StackTrace struct {
@@ -843,7 +870,7 @@ type StackTrace struct {
 func (l *Logger) ErrorF(s string, args ...interface{}) {
 	filteredStackTrace := getFilteredStacktrace()
 	formattedString := fmt.Sprintf(s, args...)
-	l.writeSwitchForFormattedString("ERROR", nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
+	l.writeSwitchForFormattedString(ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
 func (l *Logger) DebugF(s string, args ...interface{}) {
@@ -851,7 +878,7 @@ func (l *Logger) DebugF(s string, args ...interface{}) {
 	case INFO, WARN, ERROR:
 		return
 	}
-	l.writeSwitchForFormattedString("DEBUG", nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitchForFormattedString(DEBUG, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) TraceF(s string, args ...interface{}) {
@@ -859,7 +886,7 @@ func (l *Logger) TraceF(s string, args ...interface{}) {
 	case DEBUG, INFO, WARN, ERROR:
 		return
 	}
-	l.writeSwitchForFormattedString("TRACE", nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitchForFormattedString(TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) NewLine() {
@@ -896,8 +923,6 @@ func (l *Logger) PlainStderr(args ...interface{}) {
 
 var DefaultLogger = New(
 	"Default",
-	true,
-	"<hostname>",
 	"",
 	TRACE,
 	[]*os.File{os.Stdout},

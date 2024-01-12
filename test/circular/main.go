@@ -2,9 +2,10 @@ package main
 
 import (
 	jlog "github.com/oresoftware/json-logging/jlog"
+	"os"
 )
 
-var log = jlog.New("vb", true, "hn", "vibe_")
+var log = jlog.New("vb", true, "hn", "vibe_", jlog.DEBUG, []*os.File{os.Stdout})
 
 func main() {
 	//jlog.DefaultLogger.Error("foo")
