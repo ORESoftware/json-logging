@@ -21,6 +21,16 @@ import (
 	"time"
 )
 
+type LogLevel int
+
+const (
+	TRACE LogLevel = iota
+	DEBUG LogLevel = iota
+	INFO  LogLevel = iota
+	WARN  LogLevel = iota
+	ERROR LogLevel = iota
+)
+
 var isTerminal = terminal.IsTerminal(int(os.Stdout.Fd()))
 var pid = os.Getpid()
 
@@ -47,6 +57,8 @@ type Logger struct {
 	MetaFields    *MetaFields
 	LockUuid      string
 	EnvPrefix     string
+	LogLevel      LogLevel
+	Files         []*os.File
 }
 
 type LoggerParams struct {
@@ -59,14 +71,27 @@ type LoggerParams struct {
 	TimeZone      string
 	LockUuid      string
 	EnvPrefix     string
+	LogLevel      LogLevel
+	Files         []*os.File
 }
 
 func NewLogger(p LoggerParams) *Logger {
 
-	if p.HostName == "" {
+	var files = []*os.File{}
 
-		hostName := os.Getenv("HOSTNAME")
+	if p.Files != nil {
+		files = p.Files[:]
+	}
 
+	if len(files) < 1 {
+		files = append(files, os.Stdout)
+	}
+
+	hostName := p.HostName
+
+	if hostName == "" {
+
+		hostName = os.Getenv("HOSTNAME")
 		if hostName == "" {
 			hn, err := os.Hostname()
 			if err != nil {
@@ -75,8 +100,6 @@ func NewLogger(p LoggerParams) *Logger {
 				hostName = hn
 			}
 		}
-
-		p.HostName = hostName
 	}
 
 	var isLoggingJson = !isTerminal
@@ -97,8 +120,8 @@ func NewLogger(p LoggerParams) *Logger {
 	}
 
 	var metaFields = MP(
-		"git_commit", os.Getenv("vibe_git_commit"),
-		"git_repo", os.Getenv("vibe_git_repo"),
+		"git_commit", os.Getenv("jlog_git_commit"),
+		"git_repo", os.Getenv("jlog_git_repo"),
 	)
 
 	if len(p.EnvPrefix) > 0 {
@@ -119,25 +142,33 @@ func NewLogger(p LoggerParams) *Logger {
 		}
 	}
 
+	var appName = "<app>"
+	if p.AppName != "" {
+		appName = p.AppName
+	}
+
 	return &Logger{
-		AppName:       p.AppName,
+		AppName:       appName,
 		IsLoggingJSON: isLoggingJson,
-		HostName:      p.HostName,
+		HostName:      hostName,
 		ForceJSON:     p.ForceJSON,
 		ForceNonJSON:  p.ForceNonJSON,
 		TimeZone:      p.TimeZone,
 		MetaFields:    metaFields,
 		LockUuid:      p.LockUuid,
 		EnvPrefix:     p.EnvPrefix,
+		LogLevel:      p.LogLevel,
+		Files:         files,
 	}
 }
 
-func New(AppName string, forceJSON bool, hostName string, envTokenPrefix string) *Logger {
+func New(AppName string, forceJSON bool, hostName string, envTokenPrefix string, level LogLevel, files []*os.File) *Logger {
 	return NewLogger(LoggerParams{
 		AppName:   AppName,
 		ForceJSON: forceJSON,
 		HostName:  hostName,
 		EnvPrefix: envTokenPrefix,
+		Files:     files,
 	})
 }
 
@@ -220,6 +251,7 @@ func (x *LogId) IsLogId() bool {
 func Id(v string) *LogId {
 	return &LogId{myLogIdMarker, v}
 }
+
 func (l *Logger) Id(v string) *LogId {
 	return Id(v)
 }
@@ -624,16 +656,28 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
 }
 
 func (l *Logger) Info(args ...interface{}) {
+	switch l.LogLevel {
+	case WARN, ERROR:
+		return
+	}
 	var meta, newArgs = l.getMetaFields(&args)
 	l.writeSwitch("INFO", meta, &newArgs)
 }
 
 func (l *Logger) Warn(args ...interface{}) {
+	switch l.LogLevel {
+	case ERROR:
+		return
+	}
 	var meta, newArgs = l.getMetaFields(&args)
 	l.writeSwitch("WARN", meta, &newArgs)
 }
 
 func (l *Logger) Warning(args ...interface{}) {
+	switch l.LogLevel {
+	case ERROR:
+		return
+	}
 	var meta, newArgs = l.getMetaFields(&args)
 	l.writeSwitch("WARN", meta, &newArgs)
 }
@@ -646,11 +690,19 @@ func (l *Logger) Error(args ...interface{}) {
 }
 
 func (l *Logger) Debug(args ...interface{}) {
+	switch l.LogLevel {
+	case INFO, WARN, ERROR:
+		return
+	}
 	var meta, newArgs = l.getMetaFields(&args)
 	l.writeSwitch("DEBUG", meta, &newArgs)
 }
 
 func (l *Logger) Trace(args ...interface{}) {
+	switch l.LogLevel {
+	case DEBUG, INFO, WARN, ERROR:
+		return
+	}
 	var meta, newArgs = l.getMetaFields(&args)
 	l.writeSwitch("TRACE", meta, &newArgs)
 }
@@ -761,14 +813,26 @@ func (l *Logger) Tags(z *map[string]interface{}) *Logger {
 }
 
 func (l *Logger) InfoF(s string, args ...interface{}) {
+	switch l.LogLevel {
+	case WARN, ERROR:
+		return
+	}
 	l.writeSwitchForFormattedString("INFO", nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) WarnF(s string, args ...interface{}) {
+	switch l.LogLevel {
+	case ERROR:
+		return
+	}
 	l.writeSwitchForFormattedString("WARN", nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) WarningF(s string, args ...interface{}) {
+	switch l.LogLevel {
+	case ERROR:
+		return
+	}
 	l.writeSwitchForFormattedString("WARN", nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
@@ -783,10 +847,18 @@ func (l *Logger) ErrorF(s string, args ...interface{}) {
 }
 
 func (l *Logger) DebugF(s string, args ...interface{}) {
+	switch l.LogLevel {
+	case INFO, WARN, ERROR:
+		return
+	}
 	l.writeSwitchForFormattedString("DEBUG", nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) TraceF(s string, args ...interface{}) {
+	switch l.LogLevel {
+	case DEBUG, INFO, WARN, ERROR:
+		return
+	}
 	l.writeSwitchForFormattedString("TRACE", nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
@@ -827,6 +899,8 @@ var DefaultLogger = New(
 	true,
 	"<hostname>",
 	"",
+	TRACE,
+	[]*os.File{os.Stdout},
 )
 
 func init() {
