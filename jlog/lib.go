@@ -389,23 +389,23 @@ func (l *Logger) writePretty(level LogLevel, m *MetaFields, args *[]interface{})
 	switch level {
 
 	case ERROR:
-		stylizedLevel = aurora.Underline(aurora.Bold(aurora.Red(level))).String()
+		stylizedLevel = aurora.Underline(aurora.Bold(aurora.Red("ERROR"))).String()
 		break
 
 	case WARN:
-		stylizedLevel = aurora.Magenta(level).String()
+		stylizedLevel = aurora.Magenta("WARN").String()
 		break
 
 	case DEBUG:
-		stylizedLevel = aurora.Bold(level).String()
+		stylizedLevel = aurora.Bold("DEBUG").String()
 		break
 
 	case INFO:
-		stylizedLevel = aurora.Gray(12, level).String()
+		stylizedLevel = aurora.Gray(12, "INFO").String()
 		break
 
 	case TRACE:
-		stylizedLevel = aurora.Gray(4, level).String()
+		stylizedLevel = aurora.Gray(4, "TRACE").String()
 		break
 	}
 
