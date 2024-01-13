@@ -233,28 +233,34 @@ func doCopyAndDerefStruct(s interface{}) interface{} {
 }
 
 func copyAndDereference(s interface{}) interface{} {
+	val := reflect.ValueOf(s)
 
-	// Checking the type of myArray
+	// Dereference pointer if s is a pointer
+	if val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return nil
+		}
+		return copyAndDereference(val.Elem().Interface())
+	}
 
-	var kind = reflect.TypeOf(s).Kind()
-
-	if kind == reflect.Slice || kind == reflect.Array {
-		val := reflect.ValueOf(s)
+	// Checking the type of myArray or mySlice
+	if val.Kind() == reflect.Slice || val.Kind() == reflect.Array {
 		n := val.Len()
 		slice := make([]interface{}, n)
 		for i := 0; i < n; i++ {
-			slice[i] = doCopyAndDerefStruct(val.Index(i).Interface())
+			// Recursively copy and dereference each element in the slice or array
+			slice[i] = copyAndDereference(val.Index(i).Interface())
 		}
 		return slice
 	}
 
 	// Checking the type of myStruct
-	if kind == reflect.Struct {
+	if val.Kind() == reflect.Struct {
 		return doCopyAndDerefStruct(s)
 	}
 
+	// Return the original value for types that are not pointer, slice, array, or struct
 	return s
-
 }
 
 func NewMetaFields(m *MF) *MetaFields {
