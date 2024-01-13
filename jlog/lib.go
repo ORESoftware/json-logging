@@ -120,10 +120,7 @@ func NewLogger(p LoggerParams) *Logger {
 		isLoggingJson = true
 	}
 
-	var metaFields = MP(
-		"git_commit", os.Getenv("jlog_git_commit"),
-		"git_repo", os.Getenv("jlog_git_repo"),
-	)
+	var metaFields = NewMetaFields(&MF{})
 
 	if len(p.EnvPrefix) > 0 {
 		for _, env := range os.Environ() {
@@ -686,10 +683,10 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
 				m[k] = v
 			}
 		} else if z, ok := x.(*LogId); ok {
-			m["LogId"] = z.val
+			m["log_id"] = z.val
 			newArgs = append(newArgs, z.val)
 		} else if z, ok := x.(LogId); ok {
-			m["LogId"] = z.val
+			m["log_id"] = z.val
 			newArgs = append(newArgs, z.val)
 		} else {
 			newArgs = append(newArgs, x)
