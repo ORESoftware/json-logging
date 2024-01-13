@@ -1,4 +1,7 @@
 
+1. if it's a reflect.Ptr
+return "ptr (xxxx) -> " + getPrettyString(*deref)
+
 1. create a new logging instance per request and bind it to the logged-in user
 2. so that the user id is in the MetaFields
 

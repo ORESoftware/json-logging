@@ -2,10 +2,11 @@ package main
 
 import (
 	jlog "github.com/oresoftware/json-logging/jlog"
+	"os"
 	"time"
 )
 
-var log = jlog.New("foo", false, "")
+var log = jlog.New("foo", "", jlog.WARN, []*os.File{os.Stdout})
 
 func main() {
 
@@ -25,7 +26,7 @@ func main() {
 			lckLog.Warn("bbbbb")
 			time.Sleep(10 * time.Millisecond)
 			lckLog.Info("foo")
-			lckLog.Warning("bar")
+			lckLog.Warn("bar")
 			lckLog.Warn("zzz")
 
 			unlock()

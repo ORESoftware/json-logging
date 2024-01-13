@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-var log = jlog.New("vb", true, "hn", "vibe_", jlog.DEBUG, []*os.File{os.Stdout})
+var log = jlog.New("vb", "vibe_", jlog.DEBUG, []*os.File{os.Stdout})
 
 func main() {
 	//jlog.DefaultLogger.Error("foo")

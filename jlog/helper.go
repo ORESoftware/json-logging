@@ -42,6 +42,7 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, ca
 		//	getStringRepresentation(val.Interface(), nil, size, brk, depth+1, cache) +
 		//	addComma(i, n)
 
+		// TODO: get colorzied version of the values in the map
 		z := fmt.Sprintf("'%v'", k.Interface()) + aurora.Bold(" —> ").String() + fmt.Sprintf("%v", val.Interface()) + addComma(i, n)
 		size = size + len(z)
 		values = append(values, z)
@@ -422,19 +423,19 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 		}
 
 		val = val.Elem()
-		if val.IsValid() { // Check if the dereferenced value is valid
-			v = val.Interface()
 
-			if v == nil {
-				return "<nil-12>"
-			}
-
-			val = reflect.ValueOf(v)
-			kind = val.Kind()
-
-		} else {
+		if !val.IsValid() { // Check if the dereferenced value is valid
 			return "<nil-111>"
 		}
+
+		v = val.Interface()
+
+		if v == nil {
+			return "<nil-12>"
+		}
+
+		val = reflect.ValueOf(v)
+		kind = val.Kind()
 	}
 
 	if kind == reflect.Ptr {
@@ -442,6 +443,13 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 		val = reflect.ValueOf(v)
 		kind = val.Kind()
 		val = val.Elem()
+
+		if !val.IsValid() {
+			// Handle zero Value if necessary
+			return "<nil>"
+		}
+
+		v = val.Interface()
 		// Convert the dereferenced value to a string
 		//if !elem.IsValid() {
 		//	return fmt.Sprintf("%v", elem.Interface())
@@ -471,6 +479,12 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 	if kind == reflect.Interface {
 		myVal := reflect.ValueOf(v)
 		myElem := myVal.Elem()
+
+		if !myElem.IsValid() {
+			// Handle zero Value if necessary
+			return "<nil-8888>"
+		}
+
 		myInf := myElem.Interface()
 		return getStringRepresentation(myInf, &myInf, size, brk, depth, cache)
 	}
@@ -543,7 +557,6 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
 	}
 
 	if kind == reflect.Func {
-		//return "(" + runtime.FuncForPC(val.Pointer()).Name() + "(func))"
 		return getFuncSignature(v)
 	}
 

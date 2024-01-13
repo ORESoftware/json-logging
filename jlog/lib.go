@@ -233,6 +233,7 @@ func doCopyAndDerefStruct(s interface{}) interface{} {
 }
 
 func copyAndDereference(s interface{}) interface{} {
+	// // get reflect value
 	val := reflect.ValueOf(s)
 
 	// Dereference pointer if s is a pointer
@@ -240,7 +241,12 @@ func copyAndDereference(s interface{}) interface{} {
 		if val.IsNil() {
 			return nil
 		}
-		return copyAndDereference(val.Elem().Interface())
+		derefVal := val.Elem()
+		if !derefVal.IsValid() {
+			// Handle zero Value if necessary
+			return nil
+		}
+		return copyAndDereference(derefVal.Interface())
 	}
 
 	// Checking the type of myArray or mySlice
