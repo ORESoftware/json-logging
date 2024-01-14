@@ -2,15 +2,11 @@
 1. if it's a reflect.Ptr
 return "ptr (xxxx) -> " + getPrettyString(*deref)
 
-1. create a new logging instance per request and bind it to the logged-in user
-2. so that the user id is in the MetaFields
+1. TODO: different log levels for different output files
+2. the command line can set a file descriptor, so reading files in app is not a bad idea
 
 1. lock section, so that 5 lines of logs can all be in order
 2. 
-
-3. include git commit id in the metadata
-2. include git repo name in the metadata
-3. {"default":{"commitId":"", "repo":"", errorId:""}}
 
 
 In Go, `json.Marshal` returns an error in a few specific scenarios where the data structure provided to it cannot be serialized into JSON. These scenarios include:
