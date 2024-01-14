@@ -364,10 +364,17 @@ func (l *Logger) Child(m *map[string]interface{}) *Logger {
 	}
 
 	return &Logger{
-		IsLoggingJSON: l.IsLoggingJSON,
 		AppName:       l.AppName,
+		IsLoggingJSON: l.IsLoggingJSON,
 		HostName:      l.HostName,
+		ForceJSON:     l.ForceJSON,
+		ForceNonJSON:  l.ForceNonJSON,
+		TimeZone:      l.TimeZone,
 		MetaFields:    NewMetaFields(&z),
+		LockUuid:      l.LockUuid,
+		EnvPrefix:     l.EnvPrefix,
+		LogLevel:      l.LogLevel,
+		Files:         l.Files,
 	}
 }
 
@@ -376,18 +383,7 @@ type SprintFStruct struct {
 }
 
 func (l *Logger) Create(m *map[string]interface{}) *Logger {
-
-	var z = make(map[string]interface{})
-	for k, v := range *m {
-		z[k] = copyAndDereference(v)
-	}
-
-	return &Logger{
-		IsLoggingJSON: l.IsLoggingJSON,
-		AppName:       l.AppName,
-		HostName:      l.HostName,
-		MetaFields:    NewMetaFields(&z),
-	}
+	return l.Child(m)
 }
 
 func (l *Logger) writePretty(level LogLevel, m *MetaFields, args *[]interface{}) {
