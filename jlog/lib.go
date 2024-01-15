@@ -507,9 +507,9 @@ func (l *Logger) writePretty(level LogLevel, m *MetaFields, args *[]interface{})
 
 	size := 0
 
-	var primitive = true
-
 	for _, v := range *args {
+
+		var primitive = true
 
 		val := reflect.ValueOf(v)
 		var kind = reflect.TypeOf(v).Kind()
@@ -577,6 +577,24 @@ func isNonPrimitive(kind reflect.Kind) bool {
 		kind == reflect.Map ||
 		kind == reflect.Chan ||
 		kind == reflect.Interface
+}
+
+var Level = map[string]LogLevel{
+	"TRACE": TRACE,
+	"DEBUG": DEBUG,
+	"WARN":  WARN,
+	"ERROR": ERROR,
+	"INFO":  INFO,
+	"":      TRACE,
+}
+
+func ToLogLevel(s string) LogLevel {
+	var cleanVal = strings.ToUpper(strings.TrimSpace(s))
+	if v, ok := Level[cleanVal]; ok {
+		return v
+	}
+	fmt.Println(fmt.Sprintf("warning no log level could be retrieved via value: '%s'", s))
+	return TRACE
 }
 
 var levelToString = map[LogLevel]string{
