@@ -2,7 +2,7 @@
 
 set -eo pipefail
 
-cd "$(dirname "$BASH_SOURCE")";
+cd "$(dirname "${BASH_SOURCE}")";
 
 
 if [[ ! -f 'readme.md' ]]; then

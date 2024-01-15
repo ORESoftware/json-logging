@@ -48,6 +48,13 @@ var safeStderr = writer.NewSafeWriter(os.Stderr)
 
 var lockStack = stack.NewStack()
 
+type FileLevel struct {
+	Level LogLevel
+	File  *os.File
+	Tags  *map[string]interface{}
+	lock  *sync.Mutex
+}
+
 type Logger struct {
 	AppName       string
 	IsLoggingJSON bool
@@ -59,7 +66,7 @@ type Logger struct {
 	LockUuid      string
 	EnvPrefix     string
 	LogLevel      LogLevel
-	Files         []*os.File
+	Files         []*FileLevel
 }
 
 type LoggerParams struct {
@@ -73,19 +80,49 @@ type LoggerParams struct {
 	LockUuid      string
 	EnvPrefix     string
 	LogLevel      LogLevel
-	Files         []*os.File
+	Files         []*FileLevel
+}
+
+func mapFileLevels(x []*FileLevel) []*FileLevel {
+
+	var results = []*FileLevel{}
+	var m = map[uintptr]*sync.Mutex{}
+
+	for _, z := range x {
+
+		if _, ok := m[z.File.Fd()]; !ok {
+			m[z.File.Fd()] = &sync.Mutex{}
+		}
+
+		x, _ := m[z.File.Fd()]
+
+		z := &FileLevel{
+			Level: z.Level,
+			File:  z.File,
+			Tags:  z.Tags,
+			lock:  x,
+		}
+		results = append(results, z)
+	}
+
+	return results
 }
 
 func NewLogger(p LoggerParams) *Logger {
 
-	var files = []*os.File{}
+	var files = []*FileLevel{}
 
 	if p.Files != nil {
-		files = p.Files[:]
+		files = mapFileLevels(p.Files)
 	}
 
 	if len(files) < 1 {
-		files = append(files, os.Stdout)
+		files = append(files, &FileLevel{
+			Level: TRACE,
+			File:  os.Stdout,
+			Tags:  nil,
+			lock:  nil,
+		})
 	}
 
 	hostName := p.HostName
@@ -160,7 +197,7 @@ func NewLogger(p LoggerParams) *Logger {
 	}
 }
 
-func isSameFile(fd1, fd2 uintptr) (bool, error) {
+func isSameFile(fd1 uintptr, fd2 uintptr) (bool, error) {
 	var stat1, stat2 syscall.Stat_t
 	if err := syscall.Fstat(int(fd1), &stat1); err != nil {
 		return false, err
@@ -184,7 +221,7 @@ func checkIfSameFile() {
 	}
 }
 
-func NewBasicLogger(AppName string, envTokenPrefix string, level LogLevel, files ...*os.File) *Logger {
+func NewBasicLogger(AppName string, envTokenPrefix string, level LogLevel, files ...*FileLevel) *Logger {
 	return NewLogger(LoggerParams{
 		AppName:   AppName,
 		EnvPrefix: envTokenPrefix,
@@ -193,7 +230,7 @@ func NewBasicLogger(AppName string, envTokenPrefix string, level LogLevel, files
 	})
 }
 
-func New(AppName string, envTokenPrefix string, level LogLevel, files []*os.File) *Logger {
+func New(AppName string, envTokenPrefix string, level LogLevel, files []*FileLevel) *Logger {
 	return NewLogger(LoggerParams{
 		AppName:   AppName,
 		EnvPrefix: envTokenPrefix,
@@ -930,7 +967,10 @@ var DefaultLogger = New(
 	"Default",
 	"",
 	TRACE,
-	[]*os.File{os.Stdout},
+	[]*FileLevel{&FileLevel{
+		Level: TRACE,
+		File:  os.Stdout,
+	}},
 )
 
 func init() {
