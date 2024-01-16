@@ -2,6 +2,7 @@ package shared
 
 import (
 	"fmt"
+	"github.com/oresoftware/json-logging/jlog/pool"
 	"golang.org/x/crypto/ssh/terminal"
 	"os"
 	"reflect"
@@ -59,3 +60,5 @@ func IsNonPrimitive(kind reflect.Kind) bool {
 		kind == reflect.Chan ||
 		kind == reflect.Interface
 }
+
+var StdioPool = pool.CreatePool(30)

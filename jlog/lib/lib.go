@@ -21,10 +21,12 @@ import (
 	"time"
 )
 
-func WriteToStderr(args ...interface{}) {
+func writeToStderr(args ...interface{}) {
+	safeStderr.Lock()
 	if _, err := fmt.Fprintln(os.Stderr, args...); err != nil {
 		fmt.Println("adcca45f-8d7b-4d4a-8fd2-7683b7b375b5", "could not write to stderr:", err)
 	}
+	safeStderr.Unlock()
 }
 
 var safeStdout = writer.NewSafeWriter(os.Stdout)
@@ -43,6 +45,7 @@ type Logger struct {
 	LockUuid      string
 	EnvPrefix     string
 	LogLevel      shared.LogLevel
+	File          *os.File
 }
 
 type LoggerParams struct {
@@ -56,9 +59,16 @@ type LoggerParams struct {
 	LockUuid      string
 	EnvPrefix     string
 	LogLevel      shared.LogLevel
+	File          *os.File
 }
 
 func NewLogger(p LoggerParams) *Logger {
+
+	file := p.File
+
+	if file == nil {
+		file = os.Stdout
+	}
 
 	hostName := p.HostName
 
@@ -87,7 +97,7 @@ func NewLogger(p LoggerParams) *Logger {
 
 	if os.Getenv("jlog_log_json") == "yes" {
 		if p.ForceJSON {
-			WriteToStderr("forceJSON:true was used, but the 'jlog_log_json' env var was set to 'yes'.")
+			writeToStderr("forceJSON:true was used, but the 'jlog_log_json' env var was set to 'yes'.")
 		}
 		isLoggingJson = true
 	}
@@ -128,6 +138,7 @@ func NewLogger(p LoggerParams) *Logger {
 		LockUuid:      p.LockUuid,
 		EnvPrefix:     p.EnvPrefix,
 		LogLevel:      p.LogLevel,
+		File:          file,
 	}
 }
 
@@ -276,8 +287,23 @@ func (l *Logger) Create(m *map[string]interface{}) *Logger {
 	return l.Child(m)
 }
 
-func (l *Logger) writePretty(level shared.LogLevel, m *MetaFields, args *[]interface{}) {
+func (l *Logger) writeToFile(level shared.LogLevel, m *MetaFields, args *[]interface{}) {
+	b := l.getPrettyString(level, m, args)
+	l.File.WriteString(b.String())
+	// _, err := io.Copy(l.File, b.)  // TODO: copy to file, instead of buffering b.String()
+}
 
+type StrangBuilda struct {
+	strings.Builder
+}
+
+func (s StrangBuilda) Read(b []byte) (int, error) {
+	return 0, nil
+}
+
+func (l *Logger) getPrettyString(level shared.LogLevel, m *MetaFields, args *[]interface{}) *strings.Builder {
+
+	var b strings.Builder
 	date := time.Now().UTC().String()[11:25] // only first 25 chars
 	stylizedLevel := "<undefined>"
 
@@ -304,59 +330,13 @@ func (l *Logger) writePretty(level shared.LogLevel, m *MetaFields, args *[]inter
 		break
 	}
 
-	buf := []string{
-		aurora.Gray(9, date).String(), " ",
-		stylizedLevel, " ",
-		aurora.Gray(12, "app:").String() + aurora.Italic(l.AppName).String(), " ",
-	}
-
-	shared.M1.Lock()
-	peekItem, err := lockStack.Peek()
-
-	if err != nil && peekItem != nil {
-		panic("library error.")
-	}
-
-	var doUnlock = false
-	if peekItem != nil {
-
-		if peekItem.Id != l.LockUuid {
-			//fmt.Println(fmt.Sprintf("%+v", lockStack))
-			doUnlock = true
-			shared.M1.Unlock()
-			lockStack.Print("789")
-			fmt.Println("here 1", peekItem.Id)
-			peekItem.Lck.Lock()
-			fmt.Println("here 2")
-			defer func() {
-				peekItem.Lck.Unlock()
-			}()
-		}
-		//if peekItem.Id == l.LockUuid {
-		//	defer func() {
-		//		peekItem.Lck.Unlock()
-		//		lockStack.Pop()
-		//	}()
-		//} else {
-		//	peekItem.Lck.Lock()
-		//	defer func() {
-		//		peekItem.Lck.Unlock()
-		//	}()
-		//}
-	}
-
-	if !doUnlock {
-		shared.M1.Unlock()
-	}
-
-	defer shared.M1.Unlock()
-	shared.M1.Lock()
-
-	for _, v := range buf {
-		if _, err := safeStdout.WriteString(v); err != nil {
-			fmt.Println(err)
-		}
-	}
+	b.WriteString(aurora.Gray(9, date).String())
+	b.WriteString(" ")
+	b.WriteString(stylizedLevel)
+	b.WriteString(" ")
+	b.WriteString(aurora.Gray(12, "app:").String())
+	b.WriteString(aurora.Italic(l.AppName).String())
+	b.WriteString(" [ ")
 
 	size := 0
 
@@ -390,36 +370,38 @@ func (l *Logger) writePretty(level shared.LogLevel, m *MetaFields, args *[]inter
 			size = size + len(s)
 		}
 
-		if _, err := safeStdout.WriteString(s); err != nil {
-			WriteToStderr("771c710b-aba2-46ef-9126-c26d3dfe7925", err)
+		if _, err := b.WriteString(s); err != nil {
+			writeToStderr("771c710b-aba2-46ef-9126-c26d3dfe7925", err)
 		}
 
 		if !primitive && (level == shared.TRACE || level == shared.DEBUG) {
 
-			if _, err := safeStdout.WriteString("\n"); err != nil {
-				WriteToStderr("18614292-658f-42a5-81e7-593e941ea857", err)
+			if _, err := b.WriteString("\n"); err != nil {
+				writeToStderr("18614292-658f-42a5-81e7-593e941ea857", err)
 			}
 
-			if _, err := safeStdout.WriteString(fmt.Sprintf("sprintf: %+v", v)); err != nil {
-				WriteToStderr("2a795ef2-65bb-4a03-9808-b072e4497d73", err)
+			if _, err := b.WriteString(fmt.Sprintf("info as sprintf: %+v", v)); err != nil {
+				writeToStderr("2a795ef2-65bb-4a03-9808-b072e4497d73", err)
 			}
 
-			safeStdout.Write([]byte("json:"))
+			b.Write([]byte("json:"))
 			if x, err := json.Marshal(v); err == nil {
-				if _, err := safeStdout.Write(x); err != nil {
-					WriteToStderr("err:56831878-8d63-45f4-905b-d1b3bbac2152:", err)
+				if _, err := b.Write(x); err != nil {
+					writeToStderr("err:56831878-8d63-45f4-905b-d1b3bbac2152:", err)
 				}
 			} else {
-				WriteToStderr("err:70bf10e0-6e69-4a3b-bf64-08f6d20c4580:", err)
+				writeToStderr("err:70bf10e0-6e69-4a3b-bf64-08f6d20c4580:", err)
 			}
 
 		}
 
 	}
 
-	if _, err := safeStdout.WriteString("\n"); err != nil {
-		WriteToStderr("f834d14a-9735-4fd6-9389-f79144044746", err)
+	if _, err := b.WriteString(" ] \n"); err != nil {
+		writeToStderr("f834d14a-9735-4fd6-9389-f79144044746", err)
 	}
+
+	return &b
 }
 
 func (l *Logger) writeJSON(level shared.LogLevel, mf *MetaFields, args *[]interface{}) {
@@ -429,7 +411,11 @@ func (l *Logger) writeJSON(level shared.LogLevel, mf *MetaFields, args *[]interf
 	var strLevel = shared.LevelToString[level]
 	var pid = shared.PID
 
-	go func() {
+	if mf == nil {
+		mf = NewMetaFields(&MF{})
+	}
+
+	shared.StdioPool.Run(func(g *sync.WaitGroup) {
 
 		// TODO: maybe manually generating JSON is better? prob not worth it
 		buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, mf.m, args})
@@ -456,6 +442,7 @@ func (l *Logger) writeJSON(level shared.LogLevel, mf *MetaFields, args *[]interf
 
 			if err != nil {
 				fmt.Println(errors.New("Json-Logging: could not marshal the slice: " + err.Error()))
+				g.Done()
 				return
 			}
 		}
@@ -464,8 +451,9 @@ func (l *Logger) writeJSON(level shared.LogLevel, mf *MetaFields, args *[]interf
 		safeStdout.Write(buf)
 		safeStdout.Write([]byte("\n"))
 		shared.M1.Unlock()
+		g.Done()
 
-	}()
+	})
 
 }
 
@@ -473,7 +461,7 @@ func (l *Logger) writeSwitch(level shared.LogLevel, m *MetaFields, args *[]inter
 	if l.IsLoggingJSON {
 		l.writeJSON(level, m, args)
 	} else {
-		l.writePretty(level, m, args)
+		l.getPrettyString(level, m, args)
 	}
 }
 

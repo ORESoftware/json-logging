@@ -527,7 +527,11 @@ func (l *MultLogger) writeJSON(level shared.LogLevel, mf *MetaFields, args *[]in
 	var strLevel = shared.LevelToString[level]
 	var pid = shared.PID
 
-	go func() {
+	if mf == nil {
+		mf = NewMetaFields(&MF{})
+	}
+
+	shared.StdioPool.Run(func(g *sync.WaitGroup) {
 
 		// TODO - see if manually created JSON is faster
 		buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, mf.m, args})
@@ -583,17 +587,18 @@ func (l *MultLogger) writeJSON(level shared.LogLevel, mf *MetaFields, args *[]in
 			}
 
 			v.lock.Lock()
-			defer v.lock.Unlock()
+
 			if _, err := v.File.Write(buf); err != nil {
 				l.writeToStderr("1944431c-d90f-4e41-975f-206da000d85d", err)
 			}
 			if _, err := v.File.Write([]byte("\n")); err != nil {
 				l.writeToStderr("ea20aee7-862d-4596-8639-52073c835757", err)
 			}
+
 			v.lock.Unlock()
 
 		}
-	}()
+	})
 
 }
 

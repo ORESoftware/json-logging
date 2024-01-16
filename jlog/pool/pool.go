@@ -1,7 +1,6 @@
 package pool
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -9,6 +8,7 @@ type ChanMessage struct {
 	f  func(*sync.WaitGroup)
 	wg *sync.WaitGroup
 }
+
 type Worker struct {
 	c      chan *ChanMessage
 	mtx    sync.Mutex
@@ -39,8 +39,8 @@ func (p *Pool) createWorkers() {
 				w.mtx.Lock()
 				w.isBusy = true
 				p.Count++
-				fmt.Println("pool count:", p.Count, p.Size)
 				m.f(m.wg)
+				m.wg.Wait()
 				p.Count--
 				w.isBusy = false
 				w.mtx.Unlock()
@@ -72,16 +72,16 @@ func (p *Pool) Run(z func(*sync.WaitGroup)) {
 	var wg = &sync.WaitGroup{}
 	wg.Add(1)
 
-	var m = &ChanMessage{
-		f:  z,
-		wg: wg,
-	}
-
 	if p.Count >= p.Size {
 		p.mtx.Unlock()
 		// queue is full, so just create a new goroutine here
 		go z(wg)
 		return
+	}
+
+	var m = &ChanMessage{
+		f:  z,
+		wg: wg,
 	}
 
 	for _, v := range p.workers {
@@ -98,11 +98,13 @@ func (p *Pool) Run(z func(*sync.WaitGroup)) {
 	// couldn't find a non-busy one, so just round robin to next
 	p.RoundRobinCounter = (p.RoundRobinCounter + 1) % p.Size
 	var v = p.workers[p.RoundRobinCounter]
+
 	p.mtx.Unlock()
 
 	v.mtx.Lock()
 	v.isBusy = true
 	v.mtx.Unlock()
+
 	v.c <- m
 
 }
