@@ -152,11 +152,9 @@ func NewBasicLogger(AppName string, envTokenPrefix string, level shared.LogLevel
 	})
 }
 
-func New(AppName string, envTokenPrefix string, level shared.LogLevel) *Logger {
+func CreateLogger(AppName string) *Logger {
 	return NewLogger(LoggerParams{
-		AppName:   AppName,
-		EnvPrefix: envTokenPrefix,
-		LogLevel:  level,
+		AppName: AppName,
 	})
 }
 
@@ -223,6 +221,11 @@ func (l *Logger) NewLoggerWithLock() (*Logger, func()) {
 		LockUuid:      id,
 	}
 	return &z, z.unlock
+}
+
+func (l *Logger) SetEnvPrefix(s string) *Logger {
+	l.EnvPrefix = s
+	return l
 }
 
 func (l *Logger) SetToDisplayLocalTZ(f *os.File) *Logger {
@@ -810,11 +813,8 @@ func (l *Logger) PlainStderr(args ...interface{}) {
 	safeStderr.Unlock()
 }
 
-var DefaultLogger = New(
-	"Default",
-	"",
-	shared.TRACE,
-)
+var DefaultLogger = CreateLogger("Default").
+	SetLogLevel(shared.TRACE)
 
 func init() {
 
