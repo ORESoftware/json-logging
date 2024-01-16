@@ -7,6 +7,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/logrusorgru/aurora"
 	hlpr "github.com/oresoftware/json-logging/jlog/helper"
+	ll "github.com/oresoftware/json-logging/jlog/level"
 	"github.com/oresoftware/json-logging/jlog/shared"
 	"github.com/oresoftware/json-logging/jlog/stack"
 	"github.com/oresoftware/json-logging/jlog/writer"
@@ -27,7 +28,7 @@ var safeStderr = writer.NewSafeWriter(os.Stderr)
 var lockStack = stack.NewStack()
 
 type FileLevel struct {
-	Level   shared.LogLevel
+	Level   ll.LogLevel
 	File    *os.File
 	Tags    *map[string]interface{}
 	lock    *sync.Mutex
@@ -147,7 +148,7 @@ func NewLogger(p MultLoggerParams) *MultLogger {
 
 	if len(files) < 1 {
 		files = append(files, &FileLevel{
-			Level: shared.TRACE,
+			Level: ll.TRACE,
 			File:  os.Stdout,
 			Tags:  nil,
 			lock:  nil,
@@ -219,8 +220,7 @@ func (l *MultLogger) determineInitialLogLevels() {
 	l.isDebug = false
 	l.isInfo = false
 	l.isWarn = false
-	// the special one:
-	l.isError = true
+	l.isError = true // the special one:
 
 	if len(l.Files) < 1 {
 
@@ -231,7 +231,7 @@ func (l *MultLogger) determineInitialLogLevels() {
 		l.isError = true
 
 		l.Files = append(l.Files, &FileLevel{
-			Level:   shared.TRACE,
+			Level:   ll.TRACE,
 			File:    os.Stdout,
 			lock:    &sync.Mutex{},
 			isTrace: true,
@@ -250,22 +250,22 @@ func (l *MultLogger) determineInitialLogLevels() {
 		v.isError = true
 
 		switch v.Level {
-		case shared.WARN:
+		case ll.WARN:
 			v.isWarn = true
 			l.isWarn = true
-		case shared.INFO:
+		case ll.INFO:
 			v.isWarn = true
 			l.isWarn = true
 			v.isInfo = true
 			l.isInfo = true
-		case shared.DEBUG:
+		case ll.DEBUG:
 			v.isWarn = true
 			l.isWarn = true
 			v.isInfo = true
 			l.isInfo = true
 			v.isDebug = true
 			l.isDebug = true
-		case shared.TRACE:
+		case ll.TRACE:
 			v.isWarn = true
 			l.isWarn = true
 			v.isInfo = true
@@ -402,30 +402,30 @@ func (l *MultLogger) Create(m *map[string]interface{}) *MultLogger {
 	return l.Child(m)
 }
 
-func (l *MultLogger) getPrettyString(level shared.LogLevel, m *MetaFields, args *[]interface{}) string {
+func (l *MultLogger) getPrettyString(level ll.LogLevel, m *MetaFields, args *[]interface{}) string {
 
 	date := time.Now().UTC().String()[11:25] // only first 25 chars
 	stylizedLevel := "<undefined>"
 
 	switch level {
 
-	case shared.ERROR:
+	case ll.ERROR:
 		stylizedLevel = aurora.Underline(aurora.Bold(aurora.Red("ERROR"))).String()
 		break
 
-	case shared.WARN:
+	case ll.WARN:
 		stylizedLevel = aurora.Magenta("WARN").String()
 		break
 
-	case shared.DEBUG:
+	case ll.DEBUG:
 		stylizedLevel = aurora.Bold("DEBUG").String()
 		break
 
-	case shared.INFO:
+	case ll.INFO:
 		stylizedLevel = aurora.Gray(12, "INFO").String()
 		break
 
-	case shared.TRACE:
+	case ll.TRACE:
 		stylizedLevel = aurora.Gray(4, "TRACE").String()
 		break
 	}
@@ -476,7 +476,7 @@ func (l *MultLogger) getPrettyString(level shared.LogLevel, m *MetaFields, args 
 			l.writeToStderr("771c710b-aba2-46ef-9126-c26d3dfe7925", err)
 		}
 
-		if !primitive && (level == shared.TRACE || level == shared.DEBUG) {
+		if !primitive && (level == ll.TRACE || level == ll.DEBUG) {
 
 			if _, err := b.WriteString("\n"); err != nil {
 				l.writeToStderr("18614292-658f-42a5-81e7-593e941ea857", err)
@@ -520,7 +520,7 @@ func (l *MultLogger) F(s string, args ...interface{}) string {
 	return fmt.Sprintf(s, args...)
 }
 
-func (l *MultLogger) writeJSON(level shared.LogLevel, mf *MetaFields, args *[]interface{}) {
+func (l *MultLogger) writeJSON(level ll.LogLevel, mf *MetaFields, args *[]interface{}) {
 
 	date := time.Now().UTC().String()
 	date = date[:26]
@@ -565,22 +565,22 @@ func (l *MultLogger) writeJSON(level shared.LogLevel, mf *MetaFields, args *[]in
 
 			switch level {
 
-			case shared.TRACE:
+			case ll.TRACE:
 				if !v.isTrace {
 					continue
 				}
 
-			case shared.DEBUG:
+			case ll.DEBUG:
 				if !v.isDebug {
 					continue
 				}
 
-			case shared.INFO:
+			case ll.INFO:
 				if !v.isInfo {
 					continue
 				}
 
-			case shared.WARN:
+			case ll.WARN:
 				if !v.isWarn {
 					continue
 				}
@@ -618,11 +618,11 @@ func (l *MultLogger) PrintEnv() {
 	}
 }
 
-func (l *MultLogger) writeSwitchForFormattedString(level shared.LogLevel, m *MetaFields, s *[]interface{}) {
+func (l *MultLogger) writeSwitchForFormattedString(level ll.LogLevel, m *MetaFields, s *[]interface{}) {
 	l.writeJSON(level, m, s)
 }
 
-func (l *MultLogger) writeSwitch(level shared.LogLevel, m *MetaFields, args *[]interface{}) {
+func (l *MultLogger) writeSwitch(level ll.LogLevel, m *MetaFields, args *[]interface{}) {
 	l.writeJSON(level, m, args)
 }
 
@@ -693,14 +693,14 @@ func (l *MultLogger) getMetaFields(args *[]interface{}) (*MetaFields, []interfac
 func (l *MultLogger) Info(args ...interface{}) {
 	if l.isInfo {
 		var meta, newArgs = l.getMetaFields(&args)
-		l.writeSwitch(shared.INFO, meta, &newArgs)
+		l.writeSwitch(ll.INFO, meta, &newArgs)
 	}
 }
 
 func (l *MultLogger) Warn(args ...interface{}) {
 	if l.isWarn {
 		var meta, newArgs = l.getMetaFields(&args)
-		l.writeSwitch(shared.WARN, meta, &newArgs)
+		l.writeSwitch(ll.WARN, meta, &newArgs)
 	}
 }
 
@@ -708,13 +708,13 @@ func (l *MultLogger) Error(args ...interface{}) {
 	var meta, newArgs = l.getMetaFields(&args)
 	filteredStackTrace := hlpr.GetFilteredStacktrace()
 	newArgs = append(newArgs, StackTrace{filteredStackTrace})
-	l.writeSwitch(shared.ERROR, meta, &newArgs)
+	l.writeSwitch(ll.ERROR, meta, &newArgs)
 }
 
 func (l *MultLogger) Debug(args ...interface{}) {
 	if l.isDebug {
 		var meta, newArgs = l.getMetaFields(&args)
-		l.writeSwitch(shared.DEBUG, meta, &newArgs)
+		l.writeSwitch(ll.DEBUG, meta, &newArgs)
 	}
 
 }
@@ -722,7 +722,7 @@ func (l *MultLogger) Debug(args ...interface{}) {
 func (l *MultLogger) Trace(args ...interface{}) {
 	if l.isTrace {
 		var meta, newArgs = l.getMetaFields(&args)
-		l.writeSwitch(shared.TRACE, meta, &newArgs)
+		l.writeSwitch(ll.TRACE, meta, &newArgs)
 	}
 }
 
@@ -820,31 +820,31 @@ func (l *MultLogger) Tags(z *map[string]interface{}) *MultLogger {
 func (l *MultLogger) ErrorF(s string, args ...interface{}) {
 	filteredStackTrace := hlpr.GetFilteredStacktrace()
 	formattedString := fmt.Sprintf(s, args...)
-	l.writeSwitchForFormattedString(shared.ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
+	l.writeSwitchForFormattedString(ll.ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
 func (l *MultLogger) WarnF(s string, args ...interface{}) {
 	if l.isWarn {
-		l.writeSwitchForFormattedString(shared.WARN, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+		l.writeSwitchForFormattedString(ll.WARN, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 	}
 
 }
 
 func (l *MultLogger) InfoF(s string, args ...interface{}) {
 	if l.isInfo {
-		l.writeSwitchForFormattedString(shared.INFO, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+		l.writeSwitchForFormattedString(ll.INFO, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 	}
 }
 
 func (l *MultLogger) DebugF(s string, args ...interface{}) {
 	if l.isDebug {
-		l.writeSwitchForFormattedString(shared.DEBUG, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+		l.writeSwitchForFormattedString(ll.DEBUG, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 	}
 }
 
 func (l *MultLogger) TraceF(s string, args ...interface{}) {
 	if l.isTrace {
-		l.writeSwitchForFormattedString(shared.TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+		l.writeSwitchForFormattedString(ll.TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 	}
 }
 
@@ -912,7 +912,7 @@ var DefaultLogger = New(
 	"Default",
 	"",
 	[]*FileLevel{&FileLevel{
-		Level: shared.TRACE,
+		Level: ll.TRACE,
 		File:  os.Stdout,
 	}},
 )

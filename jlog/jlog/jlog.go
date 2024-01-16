@@ -27,4 +27,4 @@ var envPrefix = func() string {
 	return trimmed
 }()
 
-var Stdout = logger.New(appName, envPrefix, shared.WARN)
+var Stdout = logger.CreateLogger(appName).SetEnvPrefix("").SetLogLevel(shared.TRACE)

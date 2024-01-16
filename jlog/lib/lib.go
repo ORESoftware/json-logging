@@ -7,6 +7,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/logrusorgru/aurora"
 	hlpr "github.com/oresoftware/json-logging/jlog/helper"
+	ll "github.com/oresoftware/json-logging/jlog/level"
 	"github.com/oresoftware/json-logging/jlog/shared"
 	"github.com/oresoftware/json-logging/jlog/stack"
 	"github.com/oresoftware/json-logging/jlog/writer"
@@ -44,7 +45,7 @@ type Logger struct {
 	MetaFields    *MetaFields
 	LockUuid      string
 	EnvPrefix     string
-	LogLevel      shared.LogLevel
+	LogLevel      ll.LogLevel
 	File          *os.File
 	IsShowLocalTZ bool
 }
@@ -59,7 +60,7 @@ type LoggerParams struct {
 	TimeZone      time.Location
 	LockUuid      string
 	EnvPrefix     string
-	LogLevel      shared.LogLevel
+	LogLevel      ll.LogLevel
 	File          *os.File
 	IsShowLocalTZ bool
 }
@@ -144,7 +145,7 @@ func NewLogger(p LoggerParams) *Logger {
 	}
 }
 
-func NewBasicLogger(AppName string, envTokenPrefix string, level shared.LogLevel) *Logger {
+func NewBasicLogger(AppName string, envTokenPrefix string, level ll.LogLevel) *Logger {
 	return NewLogger(LoggerParams{
 		AppName:   AppName,
 		EnvPrefix: envTokenPrefix,
@@ -240,7 +241,7 @@ func (l *Logger) SetOutputFile(f *os.File) *Logger {
 	return l
 }
 
-func (l *Logger) SetLogLevel(f shared.LogLevel) *Logger {
+func (l *Logger) SetLogLevel(f ll.LogLevel) *Logger {
 	l.LogLevel = f
 	return l
 }
@@ -334,7 +335,7 @@ func (l *Logger) Create(m *map[string]interface{}) *Logger {
 	return l.Child(m)
 }
 
-func (l *Logger) writeToFile(time time.Time, level shared.LogLevel, m *MetaFields, args *[]interface{}) {
+func (l *Logger) writeToFile(time time.Time, level ll.LogLevel, m *MetaFields, args *[]interface{}) {
 	b := l.getPrettyString(time, level, m, args)
 	shared.M1.Lock()
 	l.File.WriteString(b.String())
@@ -350,7 +351,7 @@ func (s StrangBuilda) Read(b []byte) (int, error) {
 	return 0, nil
 }
 
-func (l *Logger) getPrettyString(time time.Time, level shared.LogLevel, m *MetaFields, args *[]interface{}) *strings.Builder {
+func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaFields, args *[]interface{}) *strings.Builder {
 
 	var b strings.Builder
 	date := time.UTC().String()[11:25] // only first 25 chars
@@ -363,23 +364,23 @@ func (l *Logger) getPrettyString(time time.Time, level shared.LogLevel, m *MetaF
 
 	switch level {
 
-	case shared.ERROR:
+	case ll.ERROR:
 		stylizedLevel = aurora.Underline(aurora.Bold(aurora.Red("ERROR"))).String()
 		break
 
-	case shared.WARN:
+	case ll.WARN:
 		stylizedLevel = aurora.Magenta("WARN").String()
 		break
 
-	case shared.DEBUG:
+	case ll.DEBUG:
 		stylizedLevel = aurora.Bold("DEBUG").String()
 		break
 
-	case shared.INFO:
+	case ll.INFO:
 		stylizedLevel = aurora.Gray(12, "INFO").String()
 		break
 
-	case shared.TRACE:
+	case ll.TRACE:
 		stylizedLevel = aurora.Gray(4, "TRACE").String()
 		break
 	}
@@ -428,7 +429,7 @@ func (l *Logger) getPrettyString(time time.Time, level shared.LogLevel, m *MetaF
 			writeToStderr("771c710b-aba2-46ef-9126-c26d3dfe7925", err)
 		}
 
-		if !primitive && (level == shared.TRACE || level == shared.DEBUG) {
+		if !primitive && (level == ll.TRACE || level == ll.DEBUG) {
 
 			if _, err := b.WriteString("\n"); err != nil {
 				writeToStderr("18614292-658f-42a5-81e7-593e941ea857", err)
@@ -458,7 +459,7 @@ func (l *Logger) getPrettyString(time time.Time, level shared.LogLevel, m *MetaF
 	return &b
 }
 
-func (l *Logger) writeJSON(time time.Time, level shared.LogLevel, mf *MetaFields, args *[]interface{}) {
+func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, args *[]interface{}) {
 
 	date := time.UTC().String()
 	date = date[:26]
@@ -511,7 +512,7 @@ func (l *Logger) writeJSON(time time.Time, level shared.LogLevel, mf *MetaFields
 
 }
 
-func (l *Logger) writeSwitch(time time.Time, level shared.LogLevel, m *MetaFields, args *[]interface{}) {
+func (l *Logger) writeSwitch(time time.Time, level ll.LogLevel, m *MetaFields, args *[]interface{}) {
 	if l.IsLoggingJSON {
 		l.writeJSON(time, level, m, args)
 	} else {
@@ -601,22 +602,22 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
 
 func (l *Logger) Info(args ...interface{}) {
 	switch l.LogLevel {
-	case shared.WARN, shared.ERROR:
+	case ll.WARN, ll.ERROR:
 		return
 	}
 	t := time.Now()
 	var meta, newArgs = l.getMetaFields(&args)
-	l.writeSwitch(t, shared.INFO, meta, &newArgs)
+	l.writeSwitch(t, ll.INFO, meta, &newArgs)
 }
 
 func (l *Logger) Warn(args ...interface{}) {
 	switch l.LogLevel {
-	case shared.ERROR:
+	case ll.ERROR:
 		return
 	}
 	t := time.Now()
 	var meta, newArgs = l.getMetaFields(&args)
-	l.writeSwitch(t, shared.WARN, meta, &newArgs)
+	l.writeSwitch(t, ll.WARN, meta, &newArgs)
 }
 
 func (l *Logger) Error(args ...interface{}) {
@@ -624,27 +625,27 @@ func (l *Logger) Error(args ...interface{}) {
 	var meta, newArgs = l.getMetaFields(&args)
 	filteredStackTrace := hlpr.GetFilteredStacktrace()
 	newArgs = append(newArgs, StackTrace{filteredStackTrace})
-	l.writeSwitch(t, shared.ERROR, meta, &newArgs)
+	l.writeSwitch(t, ll.ERROR, meta, &newArgs)
 }
 
 func (l *Logger) Debug(args ...interface{}) {
 	switch l.LogLevel {
-	case shared.INFO, shared.WARN, shared.ERROR:
+	case ll.INFO, ll.WARN, ll.ERROR:
 		return
 	}
 	t := time.Now()
 	var meta, newArgs = l.getMetaFields(&args)
-	l.writeSwitch(t, shared.DEBUG, meta, &newArgs)
+	l.writeSwitch(t, ll.DEBUG, meta, &newArgs)
 }
 
 func (l *Logger) Trace(args ...interface{}) {
 	switch l.LogLevel {
-	case shared.DEBUG, shared.INFO, shared.WARN, shared.ERROR:
+	case ll.DEBUG, ll.INFO, ll.WARN, ll.ERROR:
 		return
 	}
 	t := time.Now()
 	var meta, newArgs = l.getMetaFields(&args)
-	l.writeSwitch(t, shared.TRACE, meta, &newArgs)
+	l.writeSwitch(t, ll.TRACE, meta, &newArgs)
 }
 
 type errorIdMarker struct{}
@@ -736,20 +737,20 @@ func (l *Logger) Tags(z *map[string]interface{}) *Logger {
 
 func (l *Logger) InfoF(s string, args ...interface{}) {
 	switch l.LogLevel {
-	case shared.WARN, shared.ERROR:
+	case ll.WARN, ll.ERROR:
 		return
 	}
 	t := time.Now()
-	l.writeSwitch(t, shared.INFO, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitch(t, ll.INFO, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) WarnF(s string, args ...interface{}) {
 	switch l.LogLevel {
-	case shared.ERROR:
+	case ll.ERROR:
 		return
 	}
 	t := time.Now()
-	l.writeSwitch(t, shared.WARN, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitch(t, ll.WARN, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 type StackTrace struct {
@@ -760,25 +761,25 @@ func (l *Logger) ErrorF(s string, args ...interface{}) {
 	t := time.Now()
 	filteredStackTrace := hlpr.GetFilteredStacktrace()
 	formattedString := fmt.Sprintf(s, args...)
-	l.writeSwitch(t, shared.ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
+	l.writeSwitch(t, ll.ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
 func (l *Logger) DebugF(s string, args ...interface{}) {
 	switch l.LogLevel {
-	case shared.INFO, shared.WARN, shared.ERROR:
+	case ll.INFO, ll.WARN, ll.ERROR:
 		return
 	}
 	t := time.Now()
-	l.writeSwitch(t, shared.DEBUG, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitch(t, ll.DEBUG, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) TraceF(s string, args ...interface{}) {
 	switch l.LogLevel {
-	case shared.DEBUG, shared.INFO, shared.WARN, shared.ERROR:
+	case ll.DEBUG, ll.INFO, ll.WARN, ll.ERROR:
 		return
 	}
 	t := time.Now()
-	l.writeSwitch(t, shared.TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitch(t, ll.TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) NewLine() {
@@ -814,7 +815,7 @@ func (l *Logger) PlainStderr(args ...interface{}) {
 }
 
 var DefaultLogger = CreateLogger("Default").
-	SetLogLevel(shared.TRACE)
+	SetLogLevel(ll.TRACE)
 
 func init() {
 
