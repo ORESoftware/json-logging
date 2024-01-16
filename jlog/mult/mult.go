@@ -918,7 +918,5 @@ var DefaultLogger = New(
 )
 
 func init() {
-
 	//log.SetFlags(log.LstdFlags | log.Llongfile)
-
 }
