@@ -11,7 +11,7 @@ echo 'Compile go project to /dev/null so we dont push code that doesnt work lol'
 go build -p 6 -o '/dev/null' -v "$PWD/jlog"
 
 ssh-add -D
-ssh-add ~/.ssh/id_vibe
+ssh-add ~/.ssh/id_ed25519
 
 combined=""
 for arg in "${@}"; do
