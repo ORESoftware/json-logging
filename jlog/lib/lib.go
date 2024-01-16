@@ -736,7 +736,8 @@ func (l *Logger) InfoF(s string, args ...interface{}) {
 	case shared.WARN, shared.ERROR:
 		return
 	}
-	l.writeSwitch(shared.INFO, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	t := time.Now()
+	l.writeSwitch(t, shared.INFO, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) WarnF(s string, args ...interface{}) {
@@ -744,7 +745,8 @@ func (l *Logger) WarnF(s string, args ...interface{}) {
 	case shared.ERROR:
 		return
 	}
-	l.writeSwitch(shared.WARN, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	t := time.Now()
+	l.writeSwitch(t, shared.WARN, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 type StackTrace struct {
@@ -752,9 +754,10 @@ type StackTrace struct {
 }
 
 func (l *Logger) ErrorF(s string, args ...interface{}) {
+	t := time.Now()
 	filteredStackTrace := hlpr.GetFilteredStacktrace()
 	formattedString := fmt.Sprintf(s, args...)
-	l.writeSwitch(shared.ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
+	l.writeSwitch(t, shared.ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
 func (l *Logger) DebugF(s string, args ...interface{}) {
@@ -762,7 +765,8 @@ func (l *Logger) DebugF(s string, args ...interface{}) {
 	case shared.INFO, shared.WARN, shared.ERROR:
 		return
 	}
-	l.writeSwitch(shared.DEBUG, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	t := time.Now()
+	l.writeSwitch(t, shared.DEBUG, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) TraceF(s string, args ...interface{}) {
@@ -770,7 +774,8 @@ func (l *Logger) TraceF(s string, args ...interface{}) {
 	case shared.DEBUG, shared.INFO, shared.WARN, shared.ERROR:
 		return
 	}
-	l.writeSwitch(shared.TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	t := time.Now()
+	l.writeSwitch(t, shared.TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) NewLine() {
