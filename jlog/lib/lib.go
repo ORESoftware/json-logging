@@ -1,4 +1,4 @@
-package json_logging
+package lib
 
 import (
 	"encoding/json"
@@ -6,9 +6,10 @@ import (
 	"fmt"
 	uuid "github.com/google/uuid"
 	"github.com/logrusorgru/aurora"
+	hlpr "github.com/oresoftware/json-logging/jlog/helper"
+	"github.com/oresoftware/json-logging/jlog/shared"
 	"github.com/oresoftware/json-logging/jlog/stack"
 	"github.com/oresoftware/json-logging/jlog/writer"
-	"golang.org/x/crypto/ssh/terminal"
 	"log"
 	"os"
 	"reflect"
@@ -18,22 +19,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
-
-type LogLevel int
-
-const (
-	TRACE LogLevel = iota
-	DEBUG LogLevel = iota
-	INFO  LogLevel = iota
-	WARN  LogLevel = iota
-	ERROR LogLevel = iota
-)
-
-var isTerminal = terminal.IsTerminal(int(os.Stdout.Fd()))
-var pid = os.Getpid()
 
 func WriteToStderr(args ...interface{}) {
 	if _, err := fmt.Fprintln(os.Stderr, args...); err != nil {
@@ -41,19 +28,10 @@ func WriteToStderr(args ...interface{}) {
 	}
 }
 
-var m1 = sync.Mutex{}
-
 var safeStdout = writer.NewSafeWriter(os.Stdout)
 var safeStderr = writer.NewSafeWriter(os.Stderr)
 
 var lockStack = stack.NewStack()
-
-type FileLevel struct {
-	Level LogLevel
-	File  *os.File
-	Tags  *map[string]interface{}
-	lock  *sync.Mutex
-}
 
 type Logger struct {
 	AppName       string
@@ -65,8 +43,7 @@ type Logger struct {
 	MetaFields    *MetaFields
 	LockUuid      string
 	EnvPrefix     string
-	LogLevel      LogLevel
-	Files         []*FileLevel
+	LogLevel      shared.LogLevel
 }
 
 type LoggerParams struct {
@@ -79,51 +56,10 @@ type LoggerParams struct {
 	TimeZone      string
 	LockUuid      string
 	EnvPrefix     string
-	LogLevel      LogLevel
-	Files         []*FileLevel
-}
-
-func mapFileLevels(x []*FileLevel) []*FileLevel {
-
-	var results = []*FileLevel{}
-	var m = map[uintptr]*sync.Mutex{}
-
-	for _, z := range x {
-
-		if _, ok := m[z.File.Fd()]; !ok {
-			m[z.File.Fd()] = &sync.Mutex{}
-		}
-
-		x, _ := m[z.File.Fd()]
-
-		z := &FileLevel{
-			Level: z.Level,
-			File:  z.File,
-			Tags:  z.Tags,
-			lock:  x,
-		}
-		results = append(results, z)
-	}
-
-	return results
+	LogLevel      shared.LogLevel
 }
 
 func NewLogger(p LoggerParams) *Logger {
-
-	var files = []*FileLevel{}
-
-	if p.Files != nil {
-		files = mapFileLevels(p.Files)
-	}
-
-	if len(files) < 1 {
-		files = append(files, &FileLevel{
-			Level: TRACE,
-			File:  os.Stdout,
-			Tags:  nil,
-			lock:  nil,
-		})
-	}
 
 	hostName := p.HostName
 
@@ -140,7 +76,7 @@ func NewLogger(p LoggerParams) *Logger {
 		}
 	}
 
-	var isLoggingJson = !isTerminal
+	var isLoggingJson = !shared.IsTerminal
 
 	if p.ForceJSON {
 		isLoggingJson = true
@@ -193,48 +129,21 @@ func NewLogger(p LoggerParams) *Logger {
 		LockUuid:      p.LockUuid,
 		EnvPrefix:     p.EnvPrefix,
 		LogLevel:      p.LogLevel,
-		Files:         files,
 	}
 }
 
-func isSameFile(fd1 uintptr, fd2 uintptr) (bool, error) {
-	var stat1, stat2 syscall.Stat_t
-	if err := syscall.Fstat(int(fd1), &stat1); err != nil {
-		return false, err
-	}
-	if err := syscall.Fstat(int(fd2), &stat2); err != nil {
-		return false, err
-	}
-	return stat1.Dev == stat2.Dev && stat1.Ino == stat2.Ino, nil
-}
-
-func checkIfSameFile() {
-	same, err := isSameFile(os.Stdout.Fd(), os.Stderr.Fd())
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error checking file descriptors: %v\n", err)
-		os.Exit(1)
-	}
-	if same {
-		fmt.Println("os.Stdout and os.Stderr are directed to the same file/terminal")
-	} else {
-		fmt.Println("os.Stdout and os.Stderr are directed to different files/terminals")
-	}
-}
-
-func NewBasicLogger(AppName string, envTokenPrefix string, level LogLevel, files ...*FileLevel) *Logger {
+func NewBasicLogger(AppName string, envTokenPrefix string, level shared.LogLevel) *Logger {
 	return NewLogger(LoggerParams{
 		AppName:   AppName,
 		EnvPrefix: envTokenPrefix,
-		Files:     files,
 		LogLevel:  level,
 	})
 }
 
-func New(AppName string, envTokenPrefix string, level LogLevel, files []*FileLevel) *Logger {
+func New(AppName string, envTokenPrefix string, level shared.LogLevel) *Logger {
 	return NewLogger(LoggerParams{
 		AppName:   AppName,
 		EnvPrefix: envTokenPrefix,
-		Files:     files,
 		LogLevel:  level,
 	})
 }
@@ -251,60 +160,6 @@ type KV struct {
 
 type M = map[string]interface{}
 type L = []KV
-
-func doCopyAndDerefStruct(s interface{}) interface{} {
-	val := reflect.ValueOf(s).Elem()
-	newStruct := reflect.New(val.Type()).Elem()
-
-	for i := 0; i < val.NumField(); i++ {
-		field := val.Field(i)
-		newField := newStruct.Field(i)
-		if field.Kind() == reflect.Ptr && !field.IsNil() {
-			newField.Set(reflect.Indirect(field))
-		} else {
-			newField.Set(field)
-		}
-	}
-
-	return newStruct.Interface()
-}
-
-func copyAndDereference(s interface{}) interface{} {
-	// // get reflect value
-	val := reflect.ValueOf(s)
-
-	// Dereference pointer if s is a pointer
-	if val.Kind() == reflect.Ptr {
-		if val.IsNil() {
-			return nil
-		}
-		derefVal := val.Elem()
-		if !derefVal.IsValid() {
-			// Handle zero Value if necessary
-			return nil
-		}
-		return copyAndDereference(derefVal.Interface())
-	}
-
-	// Checking the type of myArray or mySlice
-	if val.Kind() == reflect.Slice || val.Kind() == reflect.Array {
-		n := val.Len()
-		slice := make([]interface{}, n)
-		for i := 0; i < n; i++ {
-			// Recursively copy and dereference each element in the slice or array
-			slice[i] = copyAndDereference(val.Index(i).Interface())
-		}
-		return slice
-	}
-
-	// Checking the type of myStruct
-	if val.Kind() == reflect.Struct {
-		return doCopyAndDerefStruct(s)
-	}
-
-	// Return the original value for types that are not pointer, slice, array, or struct
-	return s
-}
 
 func NewMetaFields(m *MF) *MetaFields {
 	return &MetaFields{
@@ -336,8 +191,8 @@ func (l *Logger) Id(v string) *LogId {
 }
 
 func (l *Logger) NewLoggerWithLock() (*Logger, func()) {
-	m1.Lock()
-	defer m1.Unlock()
+	shared.M1.Lock()
+	defer shared.M1.Unlock()
 	var newLck = &sync.Mutex{}
 	newLck.Lock()
 	var id = uuid.New().String()
@@ -360,8 +215,8 @@ func (l *Logger) NewLoggerWithLock() (*Logger, func()) {
 
 func (l *Logger) unlock() {
 
-	m1.Lock()
-	defer m1.Unlock()
+	shared.M1.Lock()
+	defer shared.M1.Unlock()
 
 	var peek, err = lockStack.Peek()
 
@@ -393,11 +248,11 @@ func (l *Logger) Child(m *map[string]interface{}) *Logger {
 
 	var z = make(map[string]interface{})
 	for k, v := range *l.MetaFields.m {
-		z[k] = copyAndDereference(v)
+		z[k] = hlpr.CopyAndDereference(v)
 	}
 
 	for k, v := range *m {
-		z[k] = copyAndDereference(v)
+		z[k] = hlpr.CopyAndDereference(v)
 	}
 
 	return &Logger{
@@ -411,7 +266,6 @@ func (l *Logger) Child(m *map[string]interface{}) *Logger {
 		LockUuid:      l.LockUuid,
 		EnvPrefix:     l.EnvPrefix,
 		LogLevel:      l.LogLevel,
-		Files:         l.Files,
 	}
 }
 
@@ -423,30 +277,30 @@ func (l *Logger) Create(m *map[string]interface{}) *Logger {
 	return l.Child(m)
 }
 
-func (l *Logger) writePretty(level LogLevel, m *MetaFields, args *[]interface{}) {
+func (l *Logger) writePretty(level shared.LogLevel, m *MetaFields, args *[]interface{}) {
 
 	date := time.Now().UTC().String()[11:25] // only first 25 chars
 	stylizedLevel := "<undefined>"
 
 	switch level {
 
-	case ERROR:
+	case shared.ERROR:
 		stylizedLevel = aurora.Underline(aurora.Bold(aurora.Red("ERROR"))).String()
 		break
 
-	case WARN:
+	case shared.WARN:
 		stylizedLevel = aurora.Magenta("WARN").String()
 		break
 
-	case DEBUG:
+	case shared.DEBUG:
 		stylizedLevel = aurora.Bold("DEBUG").String()
 		break
 
-	case INFO:
+	case shared.INFO:
 		stylizedLevel = aurora.Gray(12, "INFO").String()
 		break
 
-	case TRACE:
+	case shared.TRACE:
 		stylizedLevel = aurora.Gray(4, "TRACE").String()
 		break
 	}
@@ -457,7 +311,7 @@ func (l *Logger) writePretty(level LogLevel, m *MetaFields, args *[]interface{})
 		aurora.Gray(12, "app:").String() + aurora.Italic(l.AppName).String(), " ",
 	}
 
-	m1.Lock()
+	shared.M1.Lock()
 	peekItem, err := lockStack.Peek()
 
 	if err != nil && peekItem != nil {
@@ -470,7 +324,7 @@ func (l *Logger) writePretty(level LogLevel, m *MetaFields, args *[]interface{})
 		if peekItem.Id != l.LockUuid {
 			//fmt.Println(fmt.Sprintf("%+v", lockStack))
 			doUnlock = true
-			m1.Unlock()
+			shared.M1.Unlock()
 			lockStack.Print("789")
 			fmt.Println("here 1", peekItem.Id)
 			peekItem.Lck.Lock()
@@ -493,11 +347,11 @@ func (l *Logger) writePretty(level LogLevel, m *MetaFields, args *[]interface{})
 	}
 
 	if !doUnlock {
-		m1.Unlock()
+		shared.M1.Unlock()
 	}
 
-	defer m1.Unlock()
-	m1.Lock()
+	defer shared.M1.Unlock()
+	shared.M1.Lock()
 
 	for _, v := range buf {
 		if _, err := safeStdout.WriteString(v); err != nil {
@@ -525,11 +379,11 @@ func (l *Logger) writePretty(level LogLevel, m *MetaFields, args *[]interface{})
 			}
 		}
 
-		if isNonPrimitive(kind) {
+		if shared.IsNonPrimitive(kind) {
 			primitive = false
 		}
 
-		s := getPrettyString(v, size) + " "
+		s := hlpr.GetPrettyString(v, size) + " "
 		i := strings.LastIndex(s, "\n")
 		if i >= 0 {
 			size = len(s) - i
@@ -541,7 +395,7 @@ func (l *Logger) writePretty(level LogLevel, m *MetaFields, args *[]interface{})
 			WriteToStderr("771c710b-aba2-46ef-9126-c26d3dfe7925", err)
 		}
 
-		if !primitive && (level == TRACE || level == DEBUG) {
+		if !primitive && (level == shared.TRACE || level == shared.DEBUG) {
 
 			if _, err := safeStdout.WriteString("\n"); err != nil {
 				WriteToStderr("18614292-658f-42a5-81e7-593e941ea857", err)
@@ -569,47 +423,12 @@ func (l *Logger) writePretty(level LogLevel, m *MetaFields, args *[]interface{})
 	}
 }
 
-func isNonPrimitive(kind reflect.Kind) bool {
-	return kind == reflect.Slice ||
-		kind == reflect.Array ||
-		kind == reflect.Struct ||
-		kind == reflect.Func ||
-		kind == reflect.Map ||
-		kind == reflect.Chan ||
-		kind == reflect.Interface
-}
-
-var Level = map[string]LogLevel{
-	"TRACE": TRACE,
-	"DEBUG": DEBUG,
-	"WARN":  WARN,
-	"ERROR": ERROR,
-	"INFO":  INFO,
-	"":      TRACE,
-}
-
-func ToLogLevel(s string) LogLevel {
-	var cleanVal = strings.ToUpper(strings.TrimSpace(s))
-	if v, ok := Level[cleanVal]; ok {
-		return v
-	}
-	fmt.Println(fmt.Sprintf("warning no log level could be retrieved via value: '%s'", s))
-	return TRACE
-}
-
-var levelToString = map[LogLevel]string{
-	TRACE: "TRACE",
-	DEBUG: "DEBUG",
-	WARN:  "WARN",
-	ERROR: "ERROR",
-	INFO:  "INFO",
-}
-
-func (l *Logger) writeJSONFromFormattedStr(level LogLevel, m *MetaFields, s *[]interface{}) {
+func (l *Logger) writeJSONFromFormattedStr(level shared.LogLevel, m *MetaFields, s *[]interface{}) {
 
 	date := time.Now().UTC().String()
 	date = date[:26]
-	var strLevel = levelToString[level]
+	var strLevel = shared.LevelToString[level]
+	var pid = shared.PID
 
 	buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, m, s})
 
@@ -622,11 +441,12 @@ func (l *Logger) writeJSONFromFormattedStr(level LogLevel, m *MetaFields, s *[]i
 
 }
 
-func (l *Logger) writeJSON(level LogLevel, mf *MetaFields, args *[]interface{}) {
+func (l *Logger) writeJSON(level shared.LogLevel, mf *MetaFields, args *[]interface{}) {
 
 	date := time.Now().UTC().String()
 	date = date[:26]
-	var strLevel = levelToString[level]
+	var strLevel = shared.LevelToString[level]
+	var pid = shared.PID
 
 	buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, mf.m, args})
 
@@ -644,7 +464,7 @@ func (l *Logger) writeJSON(level LogLevel, mf *MetaFields, args *[]interface{}) 
 		for i := 0; i < len(*args); i++ {
 			// TODO: for now instead of cleanUp, we can ust fmt.Sprintf()
 			v := &(*args)[i]
-			c := cleanUp(v, &cache)
+			c := hlpr.CleanUp(v, &cache)
 			debug.PrintStack()
 			cleaned = append(cleaned, c)
 		}
@@ -657,13 +477,13 @@ func (l *Logger) writeJSON(level LogLevel, mf *MetaFields, args *[]interface{}) 
 		}
 	}
 
-	m1.Lock()
+	shared.M1.Lock()
 	safeStdout.Write(buf)
 	safeStdout.Write([]byte("\n"))
-	m1.Unlock()
+	shared.M1.Unlock()
 }
 
-func (l *Logger) writeSwitchForFormattedString(level LogLevel, m *MetaFields, s *[]interface{}) {
+func (l *Logger) writeSwitchForFormattedString(level shared.LogLevel, m *MetaFields, s *[]interface{}) {
 	if l.IsLoggingJSON {
 		l.writeJSONFromFormattedStr(level, m, s)
 	} else {
@@ -671,7 +491,7 @@ func (l *Logger) writeSwitchForFormattedString(level LogLevel, m *MetaFields, s 
 	}
 }
 
-func (l *Logger) writeSwitch(level LogLevel, m *MetaFields, args *[]interface{}) {
+func (l *Logger) writeSwitch(level shared.LogLevel, m *MetaFields, args *[]interface{}) {
 	if l.IsLoggingJSON {
 		l.writeJSON(level, m, args)
 	} else {
@@ -761,45 +581,45 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
 
 func (l *Logger) Info(args ...interface{}) {
 	switch l.LogLevel {
-	case WARN, ERROR:
+	case shared.WARN, shared.ERROR:
 		return
 	}
 	var meta, newArgs = l.getMetaFields(&args)
-	l.writeSwitch(INFO, meta, &newArgs)
+	l.writeSwitch(shared.INFO, meta, &newArgs)
 }
 
 func (l *Logger) Warn(args ...interface{}) {
 	switch l.LogLevel {
-	case ERROR:
+	case shared.ERROR:
 		return
 	}
 	var meta, newArgs = l.getMetaFields(&args)
-	l.writeSwitch(WARN, meta, &newArgs)
+	l.writeSwitch(shared.WARN, meta, &newArgs)
 }
 
 func (l *Logger) Error(args ...interface{}) {
 	var meta, newArgs = l.getMetaFields(&args)
-	filteredStackTrace := getFilteredStacktrace()
+	filteredStackTrace := hlpr.GetFilteredStacktrace()
 	newArgs = append(newArgs, StackTrace{filteredStackTrace})
-	l.writeSwitch(ERROR, meta, &newArgs)
+	l.writeSwitch(shared.ERROR, meta, &newArgs)
 }
 
 func (l *Logger) Debug(args ...interface{}) {
 	switch l.LogLevel {
-	case INFO, WARN, ERROR:
+	case shared.INFO, shared.WARN, shared.ERROR:
 		return
 	}
 	var meta, newArgs = l.getMetaFields(&args)
-	l.writeSwitch(DEBUG, meta, &newArgs)
+	l.writeSwitch(shared.DEBUG, meta, &newArgs)
 }
 
 func (l *Logger) Trace(args ...interface{}) {
 	switch l.LogLevel {
-	case DEBUG, INFO, WARN, ERROR:
+	case shared.DEBUG, shared.INFO, shared.WARN, shared.ERROR:
 		return
 	}
 	var meta, newArgs = l.getMetaFields(&args)
-	l.writeSwitch(TRACE, meta, &newArgs)
+	l.writeSwitch(shared.TRACE, meta, &newArgs)
 }
 
 type errorIdMarker struct{}
@@ -880,24 +700,6 @@ func MP(
 
 }
 
-func getFilteredStacktrace() *[]string {
-	// Capture the stack trace
-	buf := make([]byte, 1024)
-	n := runtime.Stack(buf, false)
-	stackTrace := string(buf[:n])
-
-	// Filter the stack trace
-	lines := strings.Split(stackTrace, "\n")
-	var filteredLines = []string{}
-	for _, line := range lines {
-		if !strings.Contains(line, "oresoftware/json-logging") {
-			filteredLines = append(filteredLines, fmt.Sprintf("%s", strings.TrimSpace(line)))
-		}
-	}
-
-	return &filteredLines
-}
-
 func (l *Logger) TagPair(k string, v interface{}) *Logger {
 	var z = map[string]interface{}{k: v}
 	return l.Child(&z)
@@ -909,18 +711,18 @@ func (l *Logger) Tags(z *map[string]interface{}) *Logger {
 
 func (l *Logger) InfoF(s string, args ...interface{}) {
 	switch l.LogLevel {
-	case WARN, ERROR:
+	case shared.WARN, shared.ERROR:
 		return
 	}
-	l.writeSwitchForFormattedString(INFO, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitchForFormattedString(shared.INFO, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) WarnF(s string, args ...interface{}) {
 	switch l.LogLevel {
-	case ERROR:
+	case shared.ERROR:
 		return
 	}
-	l.writeSwitchForFormattedString(WARN, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitchForFormattedString(shared.WARN, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 type StackTrace struct {
@@ -928,25 +730,25 @@ type StackTrace struct {
 }
 
 func (l *Logger) ErrorF(s string, args ...interface{}) {
-	filteredStackTrace := getFilteredStacktrace()
+	filteredStackTrace := hlpr.GetFilteredStacktrace()
 	formattedString := fmt.Sprintf(s, args...)
-	l.writeSwitchForFormattedString(ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
+	l.writeSwitchForFormattedString(shared.ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
 func (l *Logger) DebugF(s string, args ...interface{}) {
 	switch l.LogLevel {
-	case INFO, WARN, ERROR:
+	case shared.INFO, shared.WARN, shared.ERROR:
 		return
 	}
-	l.writeSwitchForFormattedString(DEBUG, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitchForFormattedString(shared.DEBUG, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) TraceF(s string, args ...interface{}) {
 	switch l.LogLevel {
-	case DEBUG, INFO, WARN, ERROR:
+	case shared.DEBUG, shared.INFO, shared.WARN, shared.ERROR:
 		return
 	}
-	l.writeSwitchForFormattedString(TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitchForFormattedString(shared.TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) NewLine() {
@@ -984,11 +786,7 @@ func (l *Logger) PlainStderr(args ...interface{}) {
 var DefaultLogger = New(
 	"Default",
 	"",
-	TRACE,
-	[]*FileLevel{&FileLevel{
-		Level: TRACE,
-		File:  os.Stdout,
-	}},
+	shared.TRACE,
 )
 
 func init() {
