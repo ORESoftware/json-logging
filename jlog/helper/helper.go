@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	"log"
+	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"runtime/debug"
@@ -1196,4 +1198,32 @@ func GetFilteredStacktrace() *[]string {
 	}
 
 	return &filteredLines
+}
+
+func OpenFile(fp string) (*os.File, error) {
+
+	// Get the current working directory
+	wd, err := os.Getwd()
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !filepath.IsAbs(fp) {
+		fp = filepath.Clean(filepath.Join(wd, "/", fp))
+	}
+
+	actualPath, err := filepath.EvalSymlinks(fp)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !filepath.IsAbs(actualPath) {
+		fp = filepath.Clean(filepath.Join(wd, "/", actualPath))
+	}
+
+	// Open the file with O_APPEND flag
+	return os.OpenFile(actualPath, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
+
 }

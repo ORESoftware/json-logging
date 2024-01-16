@@ -14,7 +14,6 @@ import (
 	"os"
 	"reflect"
 	"runtime"
-	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -423,24 +422,6 @@ func (l *Logger) writePretty(level shared.LogLevel, m *MetaFields, args *[]inter
 	}
 }
 
-func (l *Logger) writeJSONFromFormattedStr(level shared.LogLevel, m *MetaFields, s *[]interface{}) {
-
-	date := time.Now().UTC().String()
-	date = date[:26]
-	var strLevel = shared.LevelToString[level]
-	var pid = shared.PID
-
-	buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, m, s})
-
-	if err != nil {
-		DefaultLogger.Warn(err)
-	} else {
-		safeStdout.Write(buf)
-		safeStdout.Write([]byte("\n"))
-	}
-
-}
-
 func (l *Logger) writeJSON(level shared.LogLevel, mf *MetaFields, args *[]interface{}) {
 
 	date := time.Now().UTC().String()
@@ -448,47 +429,44 @@ func (l *Logger) writeJSON(level shared.LogLevel, mf *MetaFields, args *[]interf
 	var strLevel = shared.LevelToString[level]
 	var pid = shared.PID
 
-	buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, mf.m, args})
+	go func() {
 
-	if err != nil {
-
-		_, file, line, _ := runtime.Caller(3)
-
-		DefaultLogger.Warn("could not marshal the slice:", err.Error(), "file://"+file+":"+strconv.Itoa(line))
-
-		//cleaned := make([]interface{},0)
-
-		var cache = map[*interface{}]*interface{}{}
-		var cleaned = make([]interface{}, 0)
-
-		for i := 0; i < len(*args); i++ {
-			// TODO: for now instead of cleanUp, we can ust fmt.Sprintf()
-			v := &(*args)[i]
-			c := hlpr.CleanUp(v, &cache)
-			debug.PrintStack()
-			cleaned = append(cleaned, c)
-		}
-
-		buf, err = json.Marshal([8]interface{}{"@bunion:v1", l.AppName, level, pid, l.HostName, date, mf.m, cleaned})
+		// TODO: maybe manually generating JSON is better? prob not worth it
+		buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, mf.m, args})
 
 		if err != nil {
-			fmt.Println(errors.New("Json-Logging: could not marshal the slice: " + err.Error()))
-			return
+
+			_, file, line, _ := runtime.Caller(3)
+			DefaultLogger.Warn("could not marshal the slice:", err.Error(), "file://"+file+":"+strconv.Itoa(line))
+
+			//cleaned := make([]interface{},0)
+
+			var cache = map[*interface{}]*interface{}{}
+			var cleaned = make([]interface{}, 0)
+
+			for i := 0; i < len(*args); i++ {
+				// TODO: for now instead of cleanUp, we can ust fmt.Sprintf()
+				v := &(*args)[i]
+				c := hlpr.CleanUp(v, &cache)
+				//debug.PrintStack()
+				cleaned = append(cleaned, c)
+			}
+
+			buf, err = json.Marshal([8]interface{}{"@bunion:v1", l.AppName, level, pid, l.HostName, date, mf.m, cleaned})
+
+			if err != nil {
+				fmt.Println(errors.New("Json-Logging: could not marshal the slice: " + err.Error()))
+				return
+			}
 		}
-	}
 
-	shared.M1.Lock()
-	safeStdout.Write(buf)
-	safeStdout.Write([]byte("\n"))
-	shared.M1.Unlock()
-}
+		shared.M1.Lock()
+		safeStdout.Write(buf)
+		safeStdout.Write([]byte("\n"))
+		shared.M1.Unlock()
 
-func (l *Logger) writeSwitchForFormattedString(level shared.LogLevel, m *MetaFields, s *[]interface{}) {
-	if l.IsLoggingJSON {
-		l.writeJSONFromFormattedStr(level, m, s)
-	} else {
-		l.writePretty(level, m, s)
-	}
+	}()
+
 }
 
 func (l *Logger) writeSwitch(level shared.LogLevel, m *MetaFields, args *[]interface{}) {
@@ -714,7 +692,7 @@ func (l *Logger) InfoF(s string, args ...interface{}) {
 	case shared.WARN, shared.ERROR:
 		return
 	}
-	l.writeSwitchForFormattedString(shared.INFO, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitch(shared.INFO, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) WarnF(s string, args ...interface{}) {
@@ -722,7 +700,7 @@ func (l *Logger) WarnF(s string, args ...interface{}) {
 	case shared.ERROR:
 		return
 	}
-	l.writeSwitchForFormattedString(shared.WARN, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitch(shared.WARN, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 type StackTrace struct {
@@ -732,7 +710,7 @@ type StackTrace struct {
 func (l *Logger) ErrorF(s string, args ...interface{}) {
 	filteredStackTrace := hlpr.GetFilteredStacktrace()
 	formattedString := fmt.Sprintf(s, args...)
-	l.writeSwitchForFormattedString(shared.ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
+	l.writeSwitch(shared.ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
 func (l *Logger) DebugF(s string, args ...interface{}) {
@@ -740,7 +718,7 @@ func (l *Logger) DebugF(s string, args ...interface{}) {
 	case shared.INFO, shared.WARN, shared.ERROR:
 		return
 	}
-	l.writeSwitchForFormattedString(shared.DEBUG, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitch(shared.DEBUG, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) TraceF(s string, args ...interface{}) {
@@ -748,7 +726,7 @@ func (l *Logger) TraceF(s string, args ...interface{}) {
 	case shared.DEBUG, shared.INFO, shared.WARN, shared.ERROR:
 		return
 	}
-	l.writeSwitchForFormattedString(shared.TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	l.writeSwitch(shared.TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) NewLine() {

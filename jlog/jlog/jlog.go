@@ -19,6 +19,7 @@ var appName = func() string {
 var envPrefix = func() string {
 	var prfx = os.Getenv("jlog_env_prefix")
 	var trimmed = strings.TrimSpace(prfx)
+	// explicit AF
 	switch trimmed {
 	case "":
 		return ""

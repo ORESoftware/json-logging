@@ -14,7 +14,6 @@ import (
 	"os"
 	"reflect"
 	"runtime"
-	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,7 +24,6 @@ import (
 
 var safeStdout = writer.NewSafeWriter(os.Stdout)
 var safeStderr = writer.NewSafeWriter(os.Stderr)
-
 var lockStack = stack.NewStack()
 
 type FileLevel struct {
@@ -66,29 +64,77 @@ type MultLoggerParams struct {
 	Files      []*FileLevel
 }
 
+// TODO: create a goroutine for each Output path
+// write to that existing goroutine
+
+func getFileInfo(f *os.File) (string, error) {
+
+	var fd1 = f.Fd()
+	var stat1 syscall.Stat_t
+
+	if err := syscall.Fstat(int(fd1), &stat1); err != nil {
+		return "", err
+	}
+
+	return strconv.Itoa(int(stat1.Dev)) + ":" + strconv.Itoa(int(stat1.Ino)), nil
+}
+
 func mapFileLevels(x []*FileLevel) []*FileLevel {
 
 	var results = []*FileLevel{}
-	var m = map[uintptr]*sync.Mutex{}
+	var m1 = map[uintptr]*sync.Mutex{}
+	var m2 = map[string]*sync.Mutex{}
 
 	for _, z := range x {
 
-		if _, ok := m[z.File.Fd()]; !ok {
-			m[z.File.Fd()] = &sync.Mutex{}
+		var fd = z.File.Fd()
+		//var x = z.File.Name()
+
+		if _, ok := m1[fd]; !ok {
+			m1[fd] = &sync.Mutex{}
 		}
 
-		x, _ := m[z.File.Fd()]
-
-		z := &FileLevel{
-			Level: z.Level,
-			File:  z.File,
-			Tags:  z.Tags,
-			lock:  x,
+		if v, ok := m1[fd]; ok {
+			z.lock = v
+			results = append(results, z)
+			continue
 		}
+
+		var fileInfo, err = getFileInfo(z.File)
+
+		if err != nil {
+			z.lock = &sync.Mutex{}
+			results = append(results, z)
+			continue
+		}
+
+		if _, ok := m2[fileInfo]; !ok {
+			m2[fileInfo] = &sync.Mutex{}
+		}
+
+		var mtx, _ = m2[fileInfo]
+		z.lock = mtx
 		results = append(results, z)
+
 	}
 
 	return results
+}
+
+func NewBasicLogger(AppName string, envTokenPrefix string, files ...*FileLevel) *MultLogger {
+	return NewLogger(MultLoggerParams{
+		AppName:   AppName,
+		EnvPrefix: envTokenPrefix,
+		Files:     files,
+	})
+}
+
+func New(AppName string, envTokenPrefix string, files []*FileLevel) *MultLogger {
+	return NewLogger(MultLoggerParams{
+		AppName:   AppName,
+		EnvPrefix: envTokenPrefix,
+		Files:     files,
+	})
 }
 
 func NewLogger(p MultLoggerParams) *MultLogger {
@@ -148,7 +194,7 @@ func NewLogger(p MultLoggerParams) *MultLogger {
 		appName = p.AppName
 	}
 
-	return &MultLogger{
+	var l = &MultLogger{
 		AppName:    appName,
 		HostName:   hostName,
 		TimeZone:   p.TimeZone,
@@ -156,7 +202,15 @@ func NewLogger(p MultLoggerParams) *MultLogger {
 		LockUuid:   p.LockUuid,
 		EnvPrefix:  p.EnvPrefix,
 		Files:      files,
+		isError:    true,
+		isWarn:     false,
+		isInfo:     false,
+		isDebug:    false,
+		isTrace:    false,
 	}
+
+	l.determineInitialLogLevels()
+	return l
 }
 
 func (l *MultLogger) determineInitialLogLevels() {
@@ -165,12 +219,21 @@ func (l *MultLogger) determineInitialLogLevels() {
 	l.isDebug = false
 	l.isInfo = false
 	l.isWarn = false
+	// the special one:
 	l.isError = true
 
 	if len(l.Files) < 1 {
+
+		l.isTrace = true
+		l.isDebug = true
+		l.isInfo = true
+		l.isWarn = true
+		l.isError = true
+
 		l.Files = append(l.Files, &FileLevel{
 			Level:   shared.TRACE,
 			File:    os.Stdout,
+			lock:    &sync.Mutex{},
 			isTrace: true,
 			isDebug: true,
 			isInfo:  true,
@@ -183,65 +246,39 @@ func (l *MultLogger) determineInitialLogLevels() {
 
 	for _, v := range l.Files {
 
+		// we always log errors
+		v.isError = true
+
 		switch v.Level {
 		case shared.WARN:
 			v.isWarn = true
 			l.isWarn = true
 		case shared.INFO:
+			v.isWarn = true
+			l.isWarn = true
 			v.isInfo = true
 			l.isInfo = true
 		case shared.DEBUG:
+			v.isWarn = true
+			l.isWarn = true
+			v.isInfo = true
+			l.isInfo = true
 			v.isDebug = true
 			l.isDebug = true
 		case shared.TRACE:
+			v.isWarn = true
+			l.isWarn = true
+			v.isInfo = true
+			l.isInfo = true
+			v.isDebug = true
+			l.isDebug = true
 			v.isTrace = true
 			l.isTrace = true
 		default:
-			v.isTrace = true
-			l.isTrace = true
+			panic("should have a log-level chosen")
 		}
 
 	}
-}
-
-func isSameFile(fd1 uintptr, fd2 uintptr) (bool, error) {
-	var stat1, stat2 syscall.Stat_t
-	if err := syscall.Fstat(int(fd1), &stat1); err != nil {
-		return false, err
-	}
-	if err := syscall.Fstat(int(fd2), &stat2); err != nil {
-		return false, err
-	}
-	return stat1.Dev == stat2.Dev && stat1.Ino == stat2.Ino, nil
-}
-
-func checkIfSameFile() {
-	same, err := isSameFile(os.Stdout.Fd(), os.Stderr.Fd())
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error checking file descriptors: %v\n", err)
-		os.Exit(1)
-	}
-	if same {
-		fmt.Println("os.Stdout and os.Stderr are directed to the same file/terminal")
-	} else {
-		fmt.Println("os.Stdout and os.Stderr are directed to different files/terminals")
-	}
-}
-
-func NewBasicLogger(AppName string, envTokenPrefix string, files ...*FileLevel) *MultLogger {
-	return NewLogger(MultLoggerParams{
-		AppName:   AppName,
-		EnvPrefix: envTokenPrefix,
-		Files:     files,
-	})
-}
-
-func New(AppName string, envTokenPrefix string, files []*FileLevel) *MultLogger {
-	return NewLogger(MultLoggerParams{
-		AppName:   AppName,
-		EnvPrefix: envTokenPrefix,
-		Files:     files,
-	})
 }
 
 //func NewLogger(AppName string, forceJSON bool, hostName string, envTokenPrefix string) *MultLogger {
@@ -475,29 +512,12 @@ func (l *MultLogger) writeToStderr(args ...interface{}) {
 	}
 }
 
-func (l *MultLogger) writeJSONFromFormattedStr(level shared.LogLevel, m *MetaFields, s *[]interface{}) {
+func F(s string, args ...interface{}) string {
+	return fmt.Sprintf(s, args...)
+}
 
-	date := time.Now().UTC().String()
-	date = date[:26]
-	var strLevel = shared.LevelToString[level]
-	var pid = shared.PID
-
-	buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, m, s})
-
-	if err != nil {
-		DefaultLogger.Warn("1f1512fa-d1ff-42af-a8d0-6a52801f917d", err)
-		return
-	}
-
-	for _, v := range l.Files {
-		go func(v *FileLevel) {
-			v.lock.Lock()
-			defer v.lock.Unlock()
-			v.File.Write(buf)
-			v.File.Write([]byte("\n"))
-		}(v)
-	}
-
+func (l *MultLogger) F(s string, args ...interface{}) string {
+	return fmt.Sprintf(s, args...)
 }
 
 func (l *MultLogger) writeJSON(level shared.LogLevel, mf *MetaFields, args *[]interface{}) {
@@ -507,35 +527,61 @@ func (l *MultLogger) writeJSON(level shared.LogLevel, mf *MetaFields, args *[]in
 	var strLevel = shared.LevelToString[level]
 	var pid = shared.PID
 
-	buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, mf.m, args})
+	go func() {
 
-	if err != nil {
-
-		_, file, line, _ := runtime.Caller(3)
-
-		DefaultLogger.Warn("could not marshal the slice:", err.Error(), "file://"+file+":"+strconv.Itoa(line))
-
-		var cache = map[*interface{}]*interface{}{}
-		var cleaned = make([]interface{}, 0)
-
-		for i := 0; i < len(*args); i++ {
-			// TODO: for now instead of cleanUp, we can ust fmt.Sprintf()
-			v := &(*args)[i]
-			c := hlpr.CleanUp(v, &cache)
-			debug.PrintStack()
-			cleaned = append(cleaned, c)
-		}
-
-		buf, err = json.Marshal([8]interface{}{"@bunion:v1", l.AppName, level, pid, l.HostName, date, mf.m, cleaned})
+		// TODO - see if manually created JSON is faster
+		buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, mf.m, args})
 
 		if err != nil {
-			fmt.Println(errors.New("Json-Logging: could not marshal the slice: " + err.Error()))
-			return
-		}
-	}
 
-	for _, v := range l.Files {
-		go func(v *FileLevel) {
+			_, file, line, _ := runtime.Caller(3)
+
+			DefaultLogger.Warn("could not marshal the slice:", err.Error(), "file://"+file+":"+strconv.Itoa(line))
+
+			var cache = map[*interface{}]*interface{}{}
+			var cleaned = make([]interface{}, 0)
+
+			for i := 0; i < len(*args); i++ {
+				// TODO: for now instead of cleanUp, we can ust fmt.Sprintf()
+				v := &(*args)[i]
+				c := hlpr.CleanUp(v, &cache)
+				//debug.PrintStack()
+				cleaned = append(cleaned, c)
+			}
+
+			buf, err = json.Marshal([8]interface{}{"@bunion:v1", l.AppName, level, pid, l.HostName, date, mf.m, cleaned})
+
+			if err != nil {
+				fmt.Println(errors.New("Json-Logging: could not marshal the slice: " + err.Error()))
+				return
+			}
+		}
+
+		for _, v := range l.Files {
+
+			switch level {
+
+			case shared.TRACE:
+				if !v.isTrace {
+					continue
+				}
+
+			case shared.DEBUG:
+				if !v.isDebug {
+					continue
+				}
+
+			case shared.INFO:
+				if !v.isInfo {
+					continue
+				}
+
+			case shared.WARN:
+				if !v.isWarn {
+					continue
+				}
+			}
+
 			v.lock.Lock()
 			defer v.lock.Unlock()
 			if _, err := v.File.Write(buf); err != nil {
@@ -544,8 +590,11 @@ func (l *MultLogger) writeJSON(level shared.LogLevel, mf *MetaFields, args *[]in
 			if _, err := v.File.Write([]byte("\n")); err != nil {
 				l.writeToStderr("ea20aee7-862d-4596-8639-52073c835757", err)
 			}
-		}(v)
-	}
+			v.lock.Unlock()
+
+		}
+	}()
+
 }
 
 func (l *MultLogger) PrintEnvPlain() {
@@ -565,17 +614,11 @@ func (l *MultLogger) PrintEnv() {
 }
 
 func (l *MultLogger) writeSwitchForFormattedString(level shared.LogLevel, m *MetaFields, s *[]interface{}) {
-	if l.IsLoggingJSON {
-		l.writeJSONFromFormattedStr(level, m, s)
-	}
+	l.writeJSON(level, m, s)
 }
 
 func (l *MultLogger) writeSwitch(level shared.LogLevel, m *MetaFields, args *[]interface{}) {
-	if l.IsLoggingJSON {
-		l.writeJSON(level, m, args)
-	} else {
-		l.writePretty(level, m, args)
-	}
+	l.writeJSON(level, m, args)
 }
 
 func (l *MultLogger) JSON(args ...interface{}) {
@@ -643,18 +686,17 @@ func (l *MultLogger) getMetaFields(args *[]interface{}) (*MetaFields, []interfac
 }
 
 func (l *MultLogger) Info(args ...interface{}) {
-	var meta, newArgs = l.getMetaFields(&args)
 	if l.isInfo {
+		var meta, newArgs = l.getMetaFields(&args)
 		l.writeSwitch(shared.INFO, meta, &newArgs)
 	}
 }
 
 func (l *MultLogger) Warn(args ...interface{}) {
-	var meta, newArgs = l.getMetaFields(&args)
 	if l.isWarn {
+		var meta, newArgs = l.getMetaFields(&args)
 		l.writeSwitch(shared.WARN, meta, &newArgs)
 	}
-
 }
 
 func (l *MultLogger) Error(args ...interface{}) {
@@ -703,6 +745,10 @@ func ErrOpts(id string) *ErrorId {
 	return &ErrorId{
 		id, eidMarker,
 	}
+}
+
+type StackTrace struct {
+	ErrorTrace *[]string
 }
 
 type MF = map[string]interface{}
@@ -766,10 +812,10 @@ func (l *MultLogger) Tags(z *map[string]interface{}) *MultLogger {
 	return l.Create(z)
 }
 
-func (l *MultLogger) InfoF(s string, args ...interface{}) {
-	if l.isInfo {
-		l.writeSwitchForFormattedString(shared.INFO, nil, &[]interface{}{fmt.Sprintf(s, args...)})
-	}
+func (l *MultLogger) ErrorF(s string, args ...interface{}) {
+	filteredStackTrace := hlpr.GetFilteredStacktrace()
+	formattedString := fmt.Sprintf(s, args...)
+	l.writeSwitchForFormattedString(shared.ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
 func (l *MultLogger) WarnF(s string, args ...interface{}) {
@@ -779,14 +825,10 @@ func (l *MultLogger) WarnF(s string, args ...interface{}) {
 
 }
 
-type StackTrace struct {
-	ErrorTrace *[]string
-}
-
-func (l *MultLogger) ErrorF(s string, args ...interface{}) {
-	filteredStackTrace := hlpr.GetFilteredStacktrace()
-	formattedString := fmt.Sprintf(s, args...)
-	l.writeSwitchForFormattedString(shared.ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
+func (l *MultLogger) InfoF(s string, args ...interface{}) {
+	if l.isInfo {
+		l.writeSwitchForFormattedString(shared.INFO, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+	}
 }
 
 func (l *MultLogger) DebugF(s string, args ...interface{}) {
@@ -799,29 +841,56 @@ func (l *MultLogger) TraceF(s string, args ...interface{}) {
 	if l.isTrace {
 		l.writeSwitchForFormattedString(shared.TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 	}
-
 }
 
 func (l *MultLogger) NewLine() {
-	safeStdout.Write([]byte("\n"))
+	for _, n := range l.Files {
+		n.lock.Lock()
+		n.File.Write([]byte("\n"))
+		n.lock.Unlock()
+	}
 }
 
 func (l *MultLogger) Spaces(num int32) {
-	safeStdout.Write([]byte(strings.Join(make([]string, num), " ")))
+	for _, n := range l.Files {
+		n.lock.Lock()
+		n.File.Write([]byte(strings.Join(make([]string, num), " ")))
+		n.lock.Unlock()
+	}
 }
 
 func (l *MultLogger) Tabs(num int32) {
-	safeStdout.Write([]byte(strings.Join(make([]string, num), "\t")))
+	for _, n := range l.Files {
+		n.lock.Lock()
+		n.File.Write([]byte(strings.Join(make([]string, num), "\t")))
+		n.lock.Unlock()
+	}
 }
 
-func (l *MultLogger) PlainStdout(args ...interface{}) {
+func (l *MultLogger) JustStdout(args ...interface{}) {
 	safeStdout.Lock()
 	for _, a := range args {
 		v := fmt.Sprintf("((%T) %#v) ", a, a)
-		os.Stdout.Write([]byte(v))
+		safeStdout.Write([]byte(v))
 	}
-	os.Stdout.Write([]byte("\n"))
+	safeStdout.Write([]byte("\n"))
 	safeStdout.Unlock()
+}
+
+func (l *MultLogger) PlainStdout(args ...interface{}) {
+
+	go func() {
+		for _, n := range l.Files {
+			n.lock.Lock()
+			for _, a := range args {
+				v := fmt.Sprintf("((%T) %#v) ", a, a)
+				n.File.Write([]byte(v))
+			}
+			n.File.Write([]byte("\n"))
+			n.lock.Unlock()
+		}
+	}()
+
 }
 
 func (l *MultLogger) PlainStderr(args ...interface{}) {
