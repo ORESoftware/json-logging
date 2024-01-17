@@ -1,14 +1,13 @@
 package main
 
 import (
-	jlog "github.com/oresoftware/json-logging/jlog"
-	"os"
+	jlog "github.com/oresoftware/json-logging/jlog/lib"
 	"time"
 )
 
-var log = jlog.New("foo", "", jlog.WARN, []*os.File{os.Stdout})
+var log = jlog.CreateLogger("foo")
 
-func main() {
+func main3() {
 
 	go func() {
 		for {

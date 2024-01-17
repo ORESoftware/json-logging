@@ -1,4 +1,4 @@
-package json_logging
+package chns
 
 type Z = func(s int, c chan int)
 

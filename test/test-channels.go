@@ -3,7 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
-	json_logging "github.com/oresoftware/json-logging/jlog"
+	chns "github.com/oresoftware/json-logging/jlog"
+	jlog "github.com/oresoftware/json-logging/jlog/lib"
 	"github.com/oresoftware/json-logging/test/logging"
 	"sync"
 	"time"
@@ -35,7 +36,7 @@ func main() {
 
 func main2() {
 
-	inputs := []json_logging.Z{
+	inputs := []chns.Z{
 		func(s int, c chan int) {
 			time.Sleep(2 * time.Second)
 			c <- s + 100
@@ -47,9 +48,9 @@ func main2() {
 			c <- s + 102
 		},
 	}
-	results := json_logging.Run(inputs)
+	results := chns.Run(inputs)
 
 	for i := 0; i < len(results); i++ {
-		json_logging.DefaultLogger.Info(i, results[i])
+		jlog.DefaultLogger.Info(i, results[i])
 	}
 }
