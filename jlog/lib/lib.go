@@ -412,7 +412,7 @@ func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaField
   b.WriteString(" ")
   b.WriteString(aurora.Gray(12, "app:").String())
   b.WriteString(aurora.Italic(l.AppName).String())
-  b.WriteString(" [ ")
+  b.WriteString(" ")
 
   size := 0
 
@@ -420,8 +420,19 @@ func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaField
 
     var primitive = true
 
+    if v == nil {
+      b.WriteString(fmt.Sprintf("<nil> - (%T)", v))
+      continue
+    }
+
+    if &v == nil {
+      b.WriteString(fmt.Sprintf("<nil> (%T)", v))
+      continue
+    }
+
     val := reflect.ValueOf(v)
-    var kind = reflect.TypeOf(v).Kind()
+    var t = reflect.TypeOf(v)
+    var kind = t.Kind()
 
     if kind == reflect.Ptr {
       //v = Val.Elem().Interface()
@@ -473,7 +484,7 @@ func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaField
 
   }
 
-  if _, err := b.WriteString(" ] \n"); err != nil {
+  if _, err := b.WriteString("\n"); err != nil {
     writeToStderr("f834d14a-9735-4fd6-9389-f79144044746", err)
   }
 
@@ -637,7 +648,7 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
       if field.Kind() == reflect.Ptr {
         field = field.Elem()
       } else {
-        result[fieldName] = fmt.Sprintf("%v (%v)", field, field.String())
+        result[fieldName] = fmt.Sprintf("%v (%s)", field, field.String())
         break
       }
 
