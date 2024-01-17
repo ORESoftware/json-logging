@@ -368,14 +368,6 @@ func (l *Logger) writeToFile(time time.Time, level ll.LogLevel, m *MetaFields, a
   // _, err := io.Copy(l.File, b.)  // TODO: copy to file, instead of buffering b.String()
 }
 
-type StrangBuilda struct {
-  strings.Builder
-}
-
-func (s StrangBuilda) Read(b []byte) (int, error) {
-  return 0, nil
-}
-
 func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaFields, args *[]interface{}) *strings.Builder {
 
   var b strings.Builder
@@ -614,7 +606,7 @@ func (l *Logger) RawJSON(args ...interface{}) {
   }
 }
 
-func getInspectableVal(obj interface{}) interface{} {
+func getInspectableVal(obj interface{}, depth int) interface{} {
   ///
   val := reflect.ValueOf(obj)
   //v := val.Interface()
@@ -634,17 +626,30 @@ func getInspectableVal(obj interface{}) interface{} {
   for i := 0; i < val.NumField(); i++ {
     field := val.Field(i)
     fieldName := typ.Field(i).Name
-    if field.IsValid() && field.CanInterface() {
-      result[fieldName] = field.Interface()
-    } else {
-      result[fieldName] = field.String()
+
+    for true {
+      if field.IsValid() && field.CanInterface() {
+        result[fieldName] = field.Interface()
+        break
+      }
+      //result[fieldName] = field.Elem().Interface()
+      //result[fieldName] = field.Kind()
+      if field.Kind() == reflect.Ptr {
+        field = field.Elem()
+      } else {
+        result[fieldName] = fmt.Sprintf("%v (%v)", field, field.String())
+        break
+      }
+
     }
+
   }
 
   return result
 }
 
 func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{}) {
+  ////
   var newArgs = []interface{}{}
   var m = MF{}
   var mf = NewMetaFields(&m)
@@ -656,18 +661,18 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
   for _, x := range *args {
     if z, ok := x.(MetaFields); ok {
       for k, v := range *z.m {
-        m[k] = getInspectableVal(v)
+        m[k] = getInspectableVal(v, 0)
       }
     } else if z, ok := x.(*MetaFields); ok {
       for k, v := range *z.m {
-        m[k] = getInspectableVal(v)
+        m[k] = getInspectableVal(v, 0)
       }
     } else if z, ok := x.(*LogId); ok {
       m["log_id"] = z.Val
     } else if z, ok := x.(LogId); ok {
       m["log_id"] = z.Val
     } else {
-      newArgs = append(newArgs, getInspectableVal(x))
+      newArgs = append(newArgs, getInspectableVal(x, 0))
     }
   }
 
