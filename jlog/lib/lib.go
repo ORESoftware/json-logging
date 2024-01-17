@@ -643,18 +643,18 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
 	for _, x := range *args {
 		if z, ok := x.(MetaFields); ok {
 			for k, v := range *z.m {
-				m[k] = v
+				m[k] = getInspectableVal(v)
 			}
 		} else if z, ok := x.(*MetaFields); ok {
 			for k, v := range *z.m {
-				m[k] = v
+				m[k] = getInspectableVal(v)
 			}
 		} else if z, ok := x.(*LogId); ok {
 			m["log_id"] = z.Val
-			newArgs = append(newArgs, z.Val)
+			newArgs = append(newArgs, z)
 		} else if z, ok := x.(LogId); ok {
 			m["log_id"] = z.Val
-			newArgs = append(newArgs, z.Val)
+			newArgs = append(newArgs, z)
 		} else {
 			newArgs = append(newArgs, getInspectableVal(x))
 		}
