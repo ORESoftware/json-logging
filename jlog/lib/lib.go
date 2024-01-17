@@ -632,6 +632,39 @@ func getInspectableVal(obj interface{}) interface{} {
 }
 
 func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{}) {
+	///
+	var newArgs = []interface{}{}
+	var m = MF{}
+	var mf = NewMetaFields(&m)
+
+	for k, v := range *l.MetaFields.m {
+		m[k] = v
+	}
+
+	for _, x := range *args {
+		if z, ok := x.(MetaFields); ok {
+			for k, v := range *z.m {
+				m[k] = v
+			}
+		} else if z, ok := x.(*MetaFields); ok {
+			for k, v := range *z.m {
+				m[k] = v
+			}
+		} else if z, ok := x.(*LogId); ok {
+			m["log_id"] = z.Val
+			newArgs = append(newArgs, z.Val)
+		} else if z, ok := x.(LogId); ok {
+			m["log_id"] = z.Val
+			newArgs = append(newArgs, z.Val)
+		} else {
+			newArgs = append(newArgs, x)
+		}
+	}
+
+	return mf, newArgs
+}
+
+func (l *Logger) getMetaFields_222(args *[]interface{}) (*MetaFields, []interface{}) {
 	var newArgs = []interface{}{}
 	var m = MF{}
 	var mf = NewMetaFields(&m)
