@@ -186,7 +186,8 @@ var myLogIdMarker = &logIdMarker{}
 
 type LogId struct {
 	*logIdMarker
-	val string
+	LogId bool
+	Val   string
 }
 
 func (x *LogId) IsLogId() bool {
@@ -194,7 +195,7 @@ func (x *LogId) IsLogId() bool {
 }
 
 func Id(v string) *LogId {
-	return &LogId{myLogIdMarker, v}
+	return &LogId{myLogIdMarker, true, v}
 }
 
 func (l *Logger) Id(v string) *LogId {
@@ -432,8 +433,8 @@ func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaField
 		var kind = reflect.TypeOf(v).Kind()
 
 		if kind == reflect.Ptr {
-			//v = val.Elem().Interface()
-			//val = reflect.ValueOf(v)
+			//v = Val.Elem().Interface()
+			//Val = reflect.ValueOf(v)
 			val = val.Elem()
 			if val.IsValid() { // Check if the dereferenced value is valid
 				v = val.Interface()
@@ -606,6 +607,30 @@ func (l *Logger) RawJSON(args ...interface{}) {
 	}
 }
 
+func getInspectableVal(obj interface{}) interface{} {
+	///
+	val := reflect.ValueOf(obj)
+
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	if val.Kind() != reflect.Struct {
+		return obj
+	}
+
+	result := make(map[string]interface{})
+	typ := val.Type()
+
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+		fieldName := typ.Field(i).Name
+		result[fieldName] = field.Interface()
+	}
+
+	return result
+}
+
 func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{}) {
 	var newArgs = []interface{}{}
 	var m = MF{}
@@ -625,13 +650,13 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
 				m[k] = v
 			}
 		} else if z, ok := x.(*LogId); ok {
-			m["log_id"] = z.val
-			newArgs = append(newArgs, z.val)
+			m["log_id"] = z.Val
+			newArgs = append(newArgs, z.Val)
 		} else if z, ok := x.(LogId); ok {
-			m["log_id"] = z.val
-			newArgs = append(newArgs, z.val)
+			m["log_id"] = z.Val
+			newArgs = append(newArgs, z.Val)
 		} else {
-			newArgs = append(newArgs, x)
+			newArgs = append(newArgs, getInspectableVal(x))
 		}
 	}
 
