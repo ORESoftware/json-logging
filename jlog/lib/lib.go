@@ -41,7 +41,7 @@ type Logger struct {
 	HostName      string
 	ForceJSON     bool
 	ForceNonJSON  bool
-	TimeZone      time.Location
+	TimeZone      *time.Location
 	MetaFields    *MetaFields
 	LockUuid      string
 	EnvPrefix     string
@@ -57,7 +57,7 @@ type LoggerParams struct {
 	ForceJSON     bool
 	ForceNonJSON  bool
 	MetaFields    *MetaFields
-	TimeZone      time.Location
+	TimeZone      *time.Location
 	LockUuid      string
 	EnvPrefix     string
 	LogLevel      ll.LogLevel
@@ -262,7 +262,7 @@ func (l *Logger) SetAppName(h string) *Logger {
 }
 
 func (l *Logger) SetTimeZone(h time.Location) *Logger {
-	l.TimeZone = h
+	l.TimeZone = &h
 	return l
 }
 
@@ -357,7 +357,11 @@ func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaField
 	date := time.UTC().String()[11:25] // only first 25 chars
 
 	if l.IsShowLocalTZ {
-
+		if l.TimeZone != nil {
+			date = time.UTC().In(l.TimeZone).String()[11:25]
+		} else {
+			date = time.Local().String()[11:25] // only first 25 chars
+		}
 	}
 
 	stylizedLevel := "<undefined>"
@@ -462,6 +466,15 @@ func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaField
 func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, args *[]interface{}) {
 
 	date := time.UTC().String()
+
+	if l.IsShowLocalTZ {
+		if l.TimeZone != nil {
+			date = time.UTC().In(l.TimeZone).String()
+		} else {
+			date = time.Local().String() // only first 25 chars
+		}
+	}
+
 	date = date[:26]
 	var strLevel = shared.LevelToString[level]
 	var pid = shared.PID

@@ -40,11 +40,11 @@ type FileLevel struct {
 	isError bool
 }
 
-type MultLogger struct {
+type MultiLogger struct {
 	AppName    string
 	HostName   string
-	TimeZone   string
 	MetaFields *MetaFields
+	TimeZone   time.Location
 	LockUuid   string
 	EnvPrefix  string
 	Files      []*FileLevel
@@ -59,7 +59,7 @@ type MultLoggerParams struct {
 	AppName    string
 	HostName   string
 	MetaFields *MetaFields
-	TimeZone   string
+	TimeZone   time.Location
 	LockUuid   string
 	EnvPrefix  string
 	Files      []*FileLevel
@@ -122,23 +122,23 @@ func mapFileLevels(x []*FileLevel) []*FileLevel {
 	return results
 }
 
-func NewBasicLogger(AppName string, envTokenPrefix string, files ...*FileLevel) *MultLogger {
-	return NewLogger(MultLoggerParams{
+func NewLogger(AppName string, envTokenPrefix string, files ...*FileLevel) *MultiLogger {
+	return NewMultiLogger(MultLoggerParams{
 		AppName:   AppName,
 		EnvPrefix: envTokenPrefix,
 		Files:     files,
 	})
 }
 
-func New(AppName string, envTokenPrefix string, files []*FileLevel) *MultLogger {
-	return NewLogger(MultLoggerParams{
+func New(AppName string, envTokenPrefix string, files []*FileLevel) *MultiLogger {
+	return NewMultiLogger(MultLoggerParams{
 		AppName:   AppName,
 		EnvPrefix: envTokenPrefix,
 		Files:     files,
 	})
 }
 
-func NewLogger(p MultLoggerParams) *MultLogger {
+func NewMultiLogger(p MultLoggerParams) *MultiLogger {
 
 	var files = []*FileLevel{}
 
@@ -195,7 +195,7 @@ func NewLogger(p MultLoggerParams) *MultLogger {
 		appName = p.AppName
 	}
 
-	var l = &MultLogger{
+	var l = &MultiLogger{
 		AppName:    appName,
 		HostName:   hostName,
 		TimeZone:   p.TimeZone,
@@ -214,7 +214,66 @@ func NewLogger(p MultLoggerParams) *MultLogger {
 	return l
 }
 
-func (l *MultLogger) determineInitialLogLevels() {
+func (l *MultiLogger) SetEnvPrefix(s string) *MultiLogger {
+	l.EnvPrefix = s
+	return l
+}
+
+func (l *MultiLogger) SetToDisplayLocalTZ(f *os.File) *MultiLogger {
+	// TODO: use lock to set this
+	return l
+}
+
+func (l *MultiLogger) AddOutputFile(level ll.LogLevel, f *os.File) *MultiLogger {
+	// TODO: use lock to set this
+	l.Files = append(l.Files, &FileLevel{
+		Level:   0,
+		File:    f,
+		Tags:    nil,
+		lock:    nil,
+		IsJSON:  false,
+		isTrace: false,
+		isDebug: false,
+		isInfo:  false,
+		isWarn:  false,
+		isError: false,
+	})
+	return l
+}
+
+func (l *MultiLogger) SetMinLogLevel(f ll.LogLevel) *MultiLogger {
+	return l
+}
+
+func (l *MultiLogger) SetMaxLogLevel(f ll.LogLevel) *MultiLogger {
+	return l
+}
+
+func (l *MultiLogger) AddMetaField(s string, v interface{}) *MultiLogger {
+	(*l.MetaFields.m)[s] = v
+	return l
+}
+
+func (l *MultiLogger) SetToJSONOutput() *MultiLogger {
+	return l
+}
+
+func (l *MultiLogger) SetAppName(h string) *MultiLogger {
+	l.AppName = h
+	return l
+}
+
+func (l *MultiLogger) SetTimeZone(h time.Location) *MultiLogger {
+	l.TimeZone = h
+	return l
+}
+
+func (l *MultiLogger) SetHostName(h string) *MultiLogger {
+	l.HostName = h
+	return l
+}
+
+func (l *MultiLogger) determineInitialLogLevels() {
 	///
 	l.isTrace = false
 	l.isDebug = false
@@ -281,7 +340,7 @@ func (l *MultLogger) determineInitialLogLevels() {
 	}
 }
 
-//func NewLogger(AppName string, forceJSON bool, hostName string, envTokenPrefix string) *MultLogger {
+//func NewMultiLogger(AppName string, forceJSON bool, hostName string, envTokenPrefix string) *MultiLogger {
 //	return New(AppName, forceJSON, hostName, envTokenPrefix)
 //}
 
@@ -319,11 +378,11 @@ func Id(v string) *LogId {
 	return &LogId{myLogIdMarker, v}
 }
 
-func (l *MultLogger) Id(v string) *LogId {
+func (l *MultiLogger) Id(v string) *LogId {
 	return Id(v)
 }
 
-func (l *MultLogger) NewLoggerWithLock() (*MultLogger, func()) {
+func (l *MultiLogger) NewLoggerWithLock() (*MultiLogger, func()) {
 	shared.M1.Lock()
 	defer shared.M1.Unlock()
 	var newLck = &sync.Mutex{}
@@ -333,7 +392,7 @@ func (l *MultLogger) NewLoggerWithLock() (*MultLogger, func()) {
 		Id:  id,
 		Lck: newLck,
 	})
-	var z = MultLogger{
+	var z = MultiLogger{
 		AppName:    l.AppName,
 		HostName:   l.HostName,
 		TimeZone:   l.TimeZone,
@@ -343,7 +402,7 @@ func (l *MultLogger) NewLoggerWithLock() (*MultLogger, func()) {
 	return &z, z.unlock
 }
 
-func (l *MultLogger) unlock() {
+func (l *MultiLogger) unlock() {
 
 	shared.M1.Lock()
 	defer shared.M1.Unlock()
@@ -372,7 +431,7 @@ func (l *MultLogger) unlock() {
 
 }
 
-func (l *MultLogger) Child(m *map[string]interface{}) *MultLogger {
+func (l *MultiLogger) Child(m *map[string]interface{}) *MultiLogger {
 
 	var z = make(map[string]interface{})
 	for k, v := range *l.MetaFields.m {
@@ -383,7 +442,7 @@ func (l *MultLogger) Child(m *map[string]interface{}) *MultLogger {
 		z[k] = hlpr.CopyAndDereference(v)
 	}
 
-	return &MultLogger{
+	return &MultiLogger{
 		AppName:    l.AppName,
 		HostName:   l.HostName,
 		TimeZone:   l.TimeZone,
@@ -398,11 +457,11 @@ type SprintFStruct struct {
 	SprintF string
 }
 
-func (l *MultLogger) Create(m *map[string]interface{}) *MultLogger {
+func (l *MultiLogger) Create(m *map[string]interface{}) *MultiLogger {
 	return l.Child(m)
 }
 
-func (l *MultLogger) getPrettyString(level ll.LogLevel, m *MetaFields, args *[]interface{}) string {
+func (l *MultiLogger) getPrettyString(level ll.LogLevel, m *MetaFields, args *[]interface{}) string {
 
 	date := time.Now().UTC().String()[11:25] // only first 25 chars
 	stylizedLevel := "<undefined>"
@@ -506,7 +565,7 @@ func (l *MultLogger) getPrettyString(level ll.LogLevel, m *MetaFields, args *[]i
 	return b.String()
 }
 
-func (l *MultLogger) writeToStderr(args ...interface{}) {
+func (l *MultiLogger) writeToStderr(args ...interface{}) {
 	if _, err := fmt.Fprintln(os.Stderr, args...); err != nil {
 		fmt.Println("adcca45f-8d7b-4d4a-8fd2-7683b7b375b5", "could not write to stderr:", err)
 	}
@@ -516,11 +575,11 @@ func F(s string, args ...interface{}) string {
 	return fmt.Sprintf(s, args...)
 }
 
-func (l *MultLogger) F(s string, args ...interface{}) string {
+func (l *MultiLogger) F(s string, args ...interface{}) string {
 	return fmt.Sprintf(s, args...)
 }
 
-func (l *MultLogger) writeJSON(level ll.LogLevel, mf *MetaFields, args *[]interface{}) {
+func (l *MultiLogger) writeJSON(level ll.LogLevel, mf *MetaFields, args *[]interface{}) {
 
 	date := time.Now().UTC().String()
 	date = date[:26]
@@ -602,7 +661,7 @@ func (l *MultLogger) writeJSON(level ll.LogLevel, mf *MetaFields, args *[]interf
 
 }
 
-func (l *MultLogger) PrintEnvPlain() {
+func (l *MultiLogger) PrintEnvPlain() {
 	envVars := os.Environ() // Get all environment variables as a slice
 	sort.Strings(envVars)
 	for _, env := range envVars {
@@ -610,7 +669,7 @@ func (l *MultLogger) PrintEnvPlain() {
 	}
 }
 
-func (l *MultLogger) PrintEnv() {
+func (l *MultiLogger) PrintEnv() {
 	envVars := os.Environ() // Get all environment variables as a slice
 	sort.Strings(envVars)
 	for _, env := range envVars {
@@ -618,15 +677,15 @@ func (l *MultLogger) PrintEnv() {
 	}
 }
 
-func (l *MultLogger) writeSwitchForFormattedString(level ll.LogLevel, m *MetaFields, s *[]interface{}) {
+func (l *MultiLogger) writeSwitchForFormattedString(level ll.LogLevel, m *MetaFields, s *[]interface{}) {
 	l.writeJSON(level, m, s)
 }
 
-func (l *MultLogger) writeSwitch(level ll.LogLevel, m *MetaFields, args *[]interface{}) {
+func (l *MultiLogger) writeSwitch(level ll.LogLevel, m *MetaFields, args *[]interface{}) {
 	l.writeJSON(level, m, args)
 }
 
-func (l *MultLogger) JSON(args ...interface{}) {
+func (l *MultiLogger) JSON(args ...interface{}) {
 	size := len(args)
 	for i := 0; i < size; i++ {
 
@@ -644,7 +703,7 @@ func (l *MultLogger) JSON(args ...interface{}) {
 	os.Stdout.Write([]byte("\n"))
 }
 
-func (l *MultLogger) RawJSON(args ...interface{}) {
+func (l *MultiLogger) RawJSON(args ...interface{}) {
 	// raw = no newlines, no spaces
 	for i := 0; i < len(args); i++ {
 
@@ -658,7 +717,7 @@ func (l *MultLogger) RawJSON(args ...interface{}) {
 	}
 }
 
-func (l *MultLogger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{}) {
+func (l *MultiLogger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{}) {
 	var newArgs = []interface{}{}
 	var m = MF{}
 	var mf = NewMetaFields(&m)
@@ -690,28 +749,28 @@ func (l *MultLogger) getMetaFields(args *[]interface{}) (*MetaFields, []interfac
 	return mf, newArgs
 }
 
-func (l *MultLogger) Info(args ...interface{}) {
+func (l *MultiLogger) Info(args ...interface{}) {
 	if l.isInfo {
 		var meta, newArgs = l.getMetaFields(&args)
 		l.writeSwitch(ll.INFO, meta, &newArgs)
 	}
 }
 
-func (l *MultLogger) Warn(args ...interface{}) {
+func (l *MultiLogger) Warn(args ...interface{}) {
 	if l.isWarn {
 		var meta, newArgs = l.getMetaFields(&args)
 		l.writeSwitch(ll.WARN, meta, &newArgs)
 	}
 }
 
-func (l *MultLogger) Error(args ...interface{}) {
+func (l *MultiLogger) Error(args ...interface{}) {
 	var meta, newArgs = l.getMetaFields(&args)
 	filteredStackTrace := hlpr.GetFilteredStacktrace()
 	newArgs = append(newArgs, StackTrace{filteredStackTrace})
 	l.writeSwitch(ll.ERROR, meta, &newArgs)
 }
 
-func (l *MultLogger) Debug(args ...interface{}) {
+func (l *MultiLogger) Debug(args ...interface{}) {
 	if l.isDebug {
 		var meta, newArgs = l.getMetaFields(&args)
 		l.writeSwitch(ll.DEBUG, meta, &newArgs)
@@ -719,7 +778,7 @@ func (l *MultLogger) Debug(args ...interface{}) {
 
 }
 
-func (l *MultLogger) Trace(args ...interface{}) {
+func (l *MultiLogger) Trace(args ...interface{}) {
 	if l.isTrace {
 		var meta, newArgs = l.getMetaFields(&args)
 		l.writeSwitch(ll.TRACE, meta, &newArgs)
@@ -808,47 +867,46 @@ func MP(
 
 }
 
-func (l *MultLogger) TagPair(k string, v interface{}) *MultLogger {
+func (l *MultiLogger) TagPair(k string, v interface{}) *MultiLogger {
 	var z = map[string]interface{}{k: v}
 	return l.Child(&z)
 }
 
-func (l *MultLogger) Tags(z *map[string]interface{}) *MultLogger {
+func (l *MultiLogger) Tags(z *map[string]interface{}) *MultiLogger {
 	return l.Create(z)
 }
 
-func (l *MultLogger) ErrorF(s string, args ...interface{}) {
+func (l *MultiLogger) ErrorF(s string, args ...interface{}) {
 	filteredStackTrace := hlpr.GetFilteredStacktrace()
 	formattedString := fmt.Sprintf(s, args...)
 	l.writeSwitchForFormattedString(ll.ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
-func (l *MultLogger) WarnF(s string, args ...interface{}) {
+func (l *MultiLogger) WarnF(s string, args ...interface{}) {
 	if l.isWarn {
 		l.writeSwitchForFormattedString(ll.WARN, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 	}
-
 }
 
-func (l *MultLogger) InfoF(s string, args ...interface{}) {
+func (l *MultiLogger) InfoF(s string, args ...interface{}) {
 	if l.isInfo {
 		l.writeSwitchForFormattedString(ll.INFO, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 	}
 }
 
-func (l *MultLogger) DebugF(s string, args ...interface{}) {
+func (l *MultiLogger) DebugF(s string, args ...interface{}) {
 	if l.isDebug {
 		l.writeSwitchForFormattedString(ll.DEBUG, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 	}
 }
 
-func (l *MultLogger) TraceF(s string, args ...interface{}) {
+func (l *MultiLogger) TraceF(s string, args ...interface{}) {
 	if l.isTrace {
 		l.writeSwitchForFormattedString(ll.TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
 	}
 }
 
-func (l *MultLogger) NewLine() {
+func (l *MultiLogger) NewLine() {
 	for _, n := range l.Files {
 		n.lock.Lock()
 		n.File.Write([]byte("\n"))
@@ -856,7 +914,7 @@ func (l *MultLogger) NewLine() {
 	}
 }
 
-func (l *MultLogger) Spaces(num int32) {
+func (l *MultiLogger) Spaces(num int32) {
 	for _, n := range l.Files {
 		n.lock.Lock()
 		n.File.Write([]byte(strings.Join(make([]string, num), " ")))
@@ -864,7 +922,7 @@ func (l *MultLogger) Spaces(num int32) {
 	}
 }
 
-func (l *MultLogger) Tabs(num int32) {
+func (l *MultiLogger) Tabs(num int32) {
 	for _, n := range l.Files {
 		n.lock.Lock()
 		n.File.Write([]byte(strings.Join(make([]string, num), "\t")))
@@ -872,7 +930,7 @@ func (l *MultLogger) Tabs(num int32) {
 	}
 }
 
-func (l *MultLogger) JustStdout(args ...interface{}) {
+func (l *MultiLogger) JustStdout(args ...interface{}) {
 	safeStdout.Lock()
 	for _, a := range args {
 		v := fmt.Sprintf("((%T) %#v) ", a, a)
@@ -882,7 +940,7 @@ func (l *MultLogger) JustStdout(args ...interface{}) {
 	safeStdout.Unlock()
 }
 
-func (l *MultLogger) PlainStdout(args ...interface{}) {
+func (l *MultiLogger) PlainStdout(args ...interface{}) {
 
 	go func() {
 		for _, n := range l.Files {
@@ -898,7 +956,7 @@ func (l *MultLogger) PlainStdout(args ...interface{}) {
 
 }
 
-func (l *MultLogger) PlainStderr(args ...interface{}) {
+func (l *MultiLogger) PlainStderr(args ...interface{}) {
 	safeStderr.Lock()
 	for _, a := range args {
 		v := fmt.Sprintf("((%T) %#v) ", a, a)
