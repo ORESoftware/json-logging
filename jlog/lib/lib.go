@@ -226,12 +226,37 @@ func (l *Logger) NewLoggerWithLock() (*Logger, func()) {
 
 func (l *Logger) SetEnvPrefix(s string) *Logger {
 	l.EnvPrefix = s
+
+	if len(l.EnvPrefix) > 0 {
+		for _, env := range os.Environ() {
+			parts := strings.SplitN(env, "=", 2)
+			key := parts[0]
+			value := parts[1]
+			if strings.HasPrefix(key, l.EnvPrefix) {
+				result := strings.TrimPrefix(key, l.EnvPrefix)
+				(*l.MetaFields.m)[result] = value
+			}
+		}
+	}
+
 	return l
 }
 
-func (l *Logger) SetToDisplayLocalTZ(f *os.File) *Logger {
+func (l *Logger) SetToDisplayUTC() *Logger {
 	// TODO: use lock to set this
-	l.File = f
+	l.IsShowLocalTZ = false
+	return l
+}
+
+func (l *Logger) SetToUseTZ() *Logger {
+	// TODO: use lock to set this
+	l.IsShowLocalTZ = false
+	return l
+}
+
+func (l *Logger) SetToDisplayLocalTZ() *Logger {
+	// TODO: use lock to set this
+	l.IsShowLocalTZ = true
 	return l
 }
 

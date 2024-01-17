@@ -249,6 +249,16 @@ func (l *MultiLogger) SetMaxLogLevel(f ll.LogLevel) *MultiLogger {
 	return l
 }
 
+func (l *MultiLogger) RemoveTag(s string) *MultiLogger {
+	delete(*l.MetaFields.m, s)
+	return l
+}
+
+func (l *MultiLogger) AddTag(s string, v interface{}) *MultiLogger {
+	(*l.MetaFields.m)[s] = v
+	return l
+}
+
 func (l *MultiLogger) AddMetaField(s string, v interface{}) *MultiLogger {
 	(*l.MetaFields.m)[s] = v
 	return l

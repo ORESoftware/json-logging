@@ -1192,8 +1192,18 @@ func GetFilteredStacktrace() *[]string {
 	lines := strings.Split(stackTrace, "\n")
 	var filteredLines = []string{}
 	for _, line := range lines {
-		if !strings.Contains(line, "oresoftware/json-logging") {
-			filteredLines = append(filteredLines, fmt.Sprintf("%s", strings.TrimSpace(line)))
+
+		if strings.Contains(line, "oresoftware/json-logging") {
+			continue
+		}
+
+		if !strings.Contains(line, ".go:") {
+			continue
+		}
+
+		var nl = fmt.Sprintf("%s", strings.TrimSpace(line))
+		if len(nl) > 0 {
+			filteredLines = append(filteredLines, nl)
 		}
 	}
 
