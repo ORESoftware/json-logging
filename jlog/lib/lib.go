@@ -518,7 +518,10 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
 
   shared.StdioPool.Run(func(g *sync.WaitGroup) {
 
-    defer g.Done()
+    if g != nil {
+      defer g.Done()
+    }
+
     defer wg.Done()
 
     // TODO: maybe manually generating JSON is better? prob not worth it

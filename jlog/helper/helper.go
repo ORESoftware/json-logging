@@ -46,6 +46,7 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, ca
     //	addComma(i, n)
 
     m := val.Interface()
+    var ptr uintptr
 
     if val.Kind() == reflect.Ptr {
       val = val.Elem()
@@ -62,7 +63,7 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, ca
     if m == nil {
       z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
       z.WriteString(aurora.Bold(" —> ").String())
-      z.WriteString(fmt.Sprintf("%v (%T)", m, m))
+      z.WriteString(fmt.Sprintf(" 000 %v (%T)", m, m))
       z.WriteString(addComma(i, n))
       continue
     }
@@ -71,7 +72,7 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, ca
       // It's safe to use UnsafeAddr and NewAt since rf is addressable
       val = reflect.NewAt(val.Type(), unsafe.Pointer(val.UnsafeAddr())).Elem()
       m = val.Interface()
-      //ptr = rf.Addr().Interface()
+      ptr = val.Addr().Pointer()
     } else {
       // Handle the case where rf is not addressable
       // You might need to create a copy or take a different approach
@@ -80,13 +81,13 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, ca
       myCopy.Set(val)
       val = myCopy
       m = myCopy.Interface()
-      //ptr = myCopy.Addr().Interface()
+      ptr = myCopy.Addr().Pointer()
     }
 
     if !val.IsValid() {
       z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
       z.WriteString(aurora.Bold(" —> ").String())
-      z.WriteString(fmt.Sprintf("111 %v", m))
+      z.WriteString(fmt.Sprintf("111 %v %v", m, ptr))
       z.WriteString(addComma(i, n))
       continue
     }
@@ -94,7 +95,7 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, ca
     if val.CanInterface() {
       z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
       z.WriteString(aurora.Bold(" —> ").String())
-      z.WriteString(fmt.Sprintf(" 222 %+v %+v %v", val, m, val.String()))
+      z.WriteString(fmt.Sprintf(" 222 %T %+v %+v %v", &ptr, val, m, val.String()))
       //z.WriteString(fmt.Sprintf(" 222 %v -- %v -- %v", m, val.String(), val.Interface()))
       z.WriteString(addComma(i, n))
     } else {
