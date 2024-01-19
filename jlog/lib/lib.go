@@ -664,11 +664,17 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
 
     for true {
       if field.IsValid() && field.CanInterface() {
-        result[fieldName] = LogItem{
-          AsString:  toString,
-          ErrString: errStr,
-          Value:     field.Interface(),
+
+        if errStr == "" && toString == "" {
+          result[fieldName] = field.Interface()
+        } else {
+          result[fieldName] = LogItem{
+            AsString:  toString,
+            ErrString: errStr,
+            Value:     field.Interface(),
+          }
         }
+
         break
       }
       //result[fieldName] = field.Elem().Interface()
@@ -676,11 +682,17 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
       if field.Kind() == reflect.Ptr {
         field = field.Elem()
       } else {
-        result[fieldName] = LogItem{
-          AsString:  toString,
-          ErrString: errStr,
-          Value:     fmt.Sprintf("%v (%s)", field, field.String()),
+
+        if errStr == "" && toString == "" {
+          result[fieldName] = fmt.Sprintf("%v (%s)", field, field.String())
+        } else {
+          result[fieldName] = LogItem{
+            AsString:  toString,
+            ErrString: errStr,
+            Value:     fmt.Sprintf("%v (%s)", field, field.String()),
+          }
         }
+
         break
       }
 
