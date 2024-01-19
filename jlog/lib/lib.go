@@ -516,11 +516,9 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
   var wg = sync.WaitGroup{}
   wg.Add(1)
 
-  shared.StdioPool.Run(func(g *sync.WaitGroup) {
+  //shared.StdioPool.Run(func(g *sync.WaitGroup) {
 
-    if g != nil {
-      defer g.Done()
-    }
+  go func() {
 
     defer wg.Done()
 
@@ -557,7 +555,7 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
     safeStdout.Write(buf)
     safeStdout.Write([]byte("\n"))
     shared.M1.Unlock()
-  })
+  }()
 
   wg.Wait()
 
