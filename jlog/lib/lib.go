@@ -703,17 +703,7 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
       if field.Kind() == reflect.Ptr {
         field = field.Elem()
       } else {
-
-        if errStr == "" && toString == "" {
-          result[fieldName] = fmt.Sprintf("%v (%s)", field, field.String())
-        } else {
-          result[fieldName] = LogItem{
-            AsString:  toString,
-            ErrString: errStr,
-            Value:     fmt.Sprintf("%v (%s)", field, field.String()),
-          }
-        }
-
+        result[fieldName] = fmt.Sprintf("%v (%s)", field, field.String())
         break
       }
 
