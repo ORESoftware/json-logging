@@ -629,18 +629,108 @@ type LogItem struct {
   Value     interface{}
 }
 
+func doArray(v interface{}, val reflect.Value) *[]interface{} {
+
+  len := val.Len()
+  result := make([]interface{}, len)
+
+  for i := 0; i < len; i++ {
+    result[i] = getInspectableVal(val.Index(i).Interface(), 0)
+  }
+
+  return &result
+}
+
+func isValBad(val *reflect.Value) bool {
+
+  if val == nil {
+    return true
+  }
+
+  if !val.IsValid() {
+    // Handle invalid reflection value (e.g., nil pointer)
+    return true
+  }
+
+  return false
+}
+
 func getInspectableVal(obj interface{}, depth int) interface{} {
   ///
   val := reflect.ValueOf(obj)
+
+  if !val.IsValid() {
+    // Handle invalid reflection value (e.g., nil pointer)
+    return nil
+  }
+
   v := val.Interface()
 
   if val.Kind() == reflect.Ptr {
     val = val.Elem()
+
+    if isValBad(&val) {
+      return nil
+    }
+
     v = val.Interface()
   }
 
+  if val.Kind() == reflect.Interface {
+
+    if val.IsNil() {
+      // Handle nil interface value
+      return nil
+    }
+
+    if isValBad(&val) {
+      return nil
+    }
+
+    val = val.Elem()
+
+    if isValBad(&val) {
+      return nil
+    }
+
+    v = val.Interface()
+  }
+
+  if val.Kind() == reflect.Ptr {
+    val = val.Elem()
+
+    if isValBad(&val) {
+      return nil
+    }
+
+    v = val.Interface()
+  }
+
+  if v == nil {
+    return nil
+  }
+
+  switch val.Kind() {
+  case reflect.Slice:
+    if val.Type().Elem().Kind() == reflect.Uint8 {
+      if z, ok := v.([]byte); ok {
+        return string(z)
+      }
+      return v
+    }
+    return doArray(v, val)
+  case reflect.Array:
+    if val.Type().Elem().Kind() == reflect.Uint8 {
+      if z, ok := v.([]byte); ok {
+        return string(z)
+      }
+      return v
+    }
+    return doArray(v, val)
+  }
+
   if val.Kind() != reflect.Struct {
-    return obj
+    return v
   }
 
   var errStr = ""
@@ -657,11 +747,11 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
   result := make(map[string]interface{})
 
   if errStr != "" {
-    result["@ErrString"] = errStr
+    result["@ErrStr"] = errStr
   }
 
   if errStr != "" {
-    result["@ToString"] = toString
+    result["@ToStr"] = toString
   }
 
   typ := val.Type()
@@ -680,27 +770,29 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
       continue
     }
 
-    inf := field.Interface()
-    var errStr = ""
-    var toString = ""
+    //inf := field.Interface()
+    //var errStr = ""
+    //var toString = ""
+    //
+    //if z, ok := inf.(error); ok {
+    //  errStr = z.Error()
+    //}
+    //
+    //if z, ok := inf.(Stringer); ok {
+    //  toString = z.String()
+    //}
 
-    if z, ok := inf.(error); ok {
-      errStr = z.Error()
-    }
+    result[fieldName] = getInspectableVal(field.Interface(), depth+1)
 
-    if z, ok := inf.(Stringer); ok {
-      toString = z.String()
-    }
-
-    if errStr == "" && toString == "" {
-      result[fieldName] = inf
-    } else {
-      result[fieldName] = LogItem{
-        AsString:  toString,
-        ErrString: errStr,
-        Value:     inf,
-      }
-    }
+    //if errStr == "" && toString == "" {
+    //  result[fieldName] = inf
+    //} else {
+    //  result[fieldName] = LogItem{
+    //    AsString:  toString,
+    //    ErrString: errStr,
+    //    Value:     inf,
+    //  }
+    //}
   }
 
   return result
