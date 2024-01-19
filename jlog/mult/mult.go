@@ -760,7 +760,7 @@ func (l *MultiLogger) getMetaFields(args *[]interface{}) (*MetaFields, []interfa
   }
 
   if !hasLogId {
-    fmt.Println("missing log id:", debug.Stack())
+    fmt.Println("missing log id:", string(debug.Stack()))
   }
 
   return mf, newArgs

@@ -739,7 +739,7 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
   }
 
   if !hasLogId {
-    fmt.Println("missing log id:", debug.Stack())
+    fmt.Println("missing log id:", string(debug.Stack()))
   }
 
   return mf, newArgs
