@@ -20,6 +20,7 @@ import (
   "strings"
   "sync"
   "time"
+  "runtime/debug"
 )
 
 func writeToStderr(args ...interface{}) {
@@ -666,47 +667,40 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
   typ := val.Type()
 
   for i := 0; i < val.NumField(); i++ {
+
     field := val.Field(i)
     fieldName := typ.Field(i).Name
 
-    for true {
-      if field.IsValid() && field.CanInterface() {
-
-        inf := field.Interface()
-        var errStr = ""
-        var toString = ""
-
-        if z, ok := inf.(error); ok {
-          errStr = z.Error()
-        }
-
-        if z, ok := inf.(Stringer); ok {
-          toString = z.String()
-        }
-
-        if errStr == "" && toString == "" {
-          result[fieldName] = inf
-        } else {
-          result[fieldName] = LogItem{
-            AsString:  toString,
-            ErrString: errStr,
-            Value:     inf,
-          }
-        }
-
-        break
-      }
-      //result[fieldName] = field.Elem().Interface()
-      //result[fieldName] = field.Kind()
-      if field.Kind() == reflect.Ptr {
-        field = field.Elem()
-      } else {
-        result[fieldName] = fmt.Sprintf("%v (%s)", field, field.String())
-        break
-      }
-
+    if field.Kind() == reflect.Ptr {
+      field = field.Elem()
     }
 
+    if !(field.IsValid() && field.CanInterface()) {
+      result[fieldName] = fmt.Sprintf("%v (%s)", field, field.String())
+      continue
+    }
+
+    inf := field.Interface()
+    var errStr = ""
+    var toString = ""
+
+    if z, ok := inf.(error); ok {
+      errStr = z.Error()
+    }
+
+    if z, ok := inf.(Stringer); ok {
+      toString = z.String()
+    }
+
+    if errStr == "" && toString == "" {
+      result[fieldName] = inf
+    } else {
+      result[fieldName] = LogItem{
+        AsString:  toString,
+        ErrString: errStr,
+        Value:     inf,
+      }
+    }
   }
 
   return result
@@ -722,6 +716,8 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
     m[k] = v
   }
 
+  var hasLogId = false
+
   for _, x := range *args {
     if z, ok := x.(MetaFields); ok {
       for k, v := range *z.m {
@@ -733,11 +729,17 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
       }
     } else if z, ok := x.(*LogId); ok {
       m["log_id"] = z.Val
+      hasLogId = true
     } else if z, ok := x.(LogId); ok {
       m["log_id"] = z.Val
+      hasLogId = true
     } else {
       newArgs = append(newArgs, getInspectableVal(x, 0))
     }
+  }
+
+  if !hasLogId {
+    fmt.Println("missing log id:", debug.Stack())
   }
 
   return mf, newArgs
