@@ -656,6 +656,15 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
   }
 
   result := make(map[string]interface{})
+
+  if errStr != "" {
+    result["@ErrString"] = errStr
+  }
+
+  if errStr != "" {
+    result["@ToString"] = toString
+  }
+
   typ := val.Type()
 
   for i := 0; i < val.NumField(); i++ {
@@ -665,13 +674,25 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
     for true {
       if field.IsValid() && field.CanInterface() {
 
+        inf := field.Interface()
+        var errStr = ""
+        var toString = ""
+
+        if z, ok := inf.(error); ok {
+          errStr = z.Error()
+        }
+
+        if z, ok := inf.(Stringer); ok {
+          toString = z.String()
+        }
+
         if errStr == "" && toString == "" {
-          result[fieldName] = field.Interface()
+          result[fieldName] = inf
         } else {
           result[fieldName] = LogItem{
             AsString:  toString,
             ErrString: errStr,
-            Value:     field.Interface(),
+            Value:     inf,
           }
         }
 
