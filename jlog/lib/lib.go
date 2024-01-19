@@ -620,18 +620,39 @@ func (l *Logger) RawJSON(args ...interface{}) {
   }
 }
 
+type Stringer interface {
+  String() string
+}
+
+type LogItem struct {
+  AsString  string
+  ErrString string
+  Value     interface{}
+}
+
 func getInspectableVal(obj interface{}, depth int) interface{} {
   ///
   val := reflect.ValueOf(obj)
-  //v := val.Interface()
+  v := val.Interface()
 
   if val.Kind() == reflect.Ptr {
     val = val.Elem()
-    //v = val.Interface()
+    v = val.Interface()
   }
 
   if val.Kind() != reflect.Struct {
     return obj
+  }
+
+  var errStr = ""
+  var toString = ""
+
+  if z, ok := v.(error); ok {
+    errStr = z.Error()
+  }
+
+  if z, ok := v.(Stringer); ok {
+    toString = z.String()
   }
 
   result := make(map[string]interface{})
@@ -643,7 +664,11 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
 
     for true {
       if field.IsValid() && field.CanInterface() {
-        result[fieldName] = field.Interface()
+        result[fieldName] = LogItem{
+          AsString:  toString,
+          ErrString: errStr,
+          Value:     field.Interface(),
+        }
         break
       }
       //result[fieldName] = field.Elem().Interface()
@@ -651,7 +676,11 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
       if field.Kind() == reflect.Ptr {
         field = field.Elem()
       } else {
-        result[fieldName] = fmt.Sprintf("%v (%s)", field, field.String())
+        result[fieldName] = LogItem{
+          AsString:  toString,
+          ErrString: errStr,
+          Value:     fmt.Sprintf("%v (%s)", field, field.String()),
+        }
         break
       }
 

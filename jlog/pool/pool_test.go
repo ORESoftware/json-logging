@@ -6,6 +6,7 @@ import (
   "testing"
   "time"
   "runtime"
+  "math/rand"
 )
 
 func printMemoryStats(t *testing.T) {
@@ -17,7 +18,7 @@ func printMemoryStats(t *testing.T) {
 
 func TestWorkerPoolSimple(t *testing.T) {
 
-  p := pool.CreatePool(500)
+  p := pool.CreatePool(200)
 
   numTasks := 500000
   var wg sync.WaitGroup
@@ -25,6 +26,12 @@ func TestWorkerPoolSimple(t *testing.T) {
 
   for i := 0; i < numTasks; i++ {
     go func(index int) {
+
+      randomSource := rand.NewSource(time.Now().UnixNano())
+      randomGenerator := rand.New(randomSource)
+      randomDuration := time.Duration(randomGenerator.Intn(8)+2) * time.Second
+      time.Sleep(randomDuration)
+
       p.Run(func(g *sync.WaitGroup) {
         // Perform a task and log the index
         t.Logf("Task %d executed", index)
@@ -46,6 +53,7 @@ func TestWorkerPoolSimple(t *testing.T) {
   }
 
   printMemoryStats(t)
+  t.Logf("%+v", *p)
 }
 
 // Test if the worker pool can handle a simple task

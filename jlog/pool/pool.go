@@ -19,9 +19,13 @@ type Pool struct {
   once              *sync.Once
   mtx               *sync.Mutex
   Size              int
+  readyWorkers      *DoublyLinkedList
   workers           []*Worker
   Count             int
   RoundRobinCounter int
+  NewGRCount        int
+  RRCount           int
+  FreeWorkerCount   int
 }
 
 func (p *Pool) incrementCount() {
@@ -33,6 +37,12 @@ func (p *Pool) incrementCount() {
 func (p *Pool) decrementCount() {
   p.mtx.Lock()
   p.Count--
+  p.mtx.Unlock()
+}
+
+func (p *Pool) enqueueWorker(w *Worker) {
+  p.mtx.Lock()
+  p.readyWorkers.Enqueue(w)
   p.mtx.Unlock()
 }
 
@@ -56,6 +66,7 @@ func (p *Pool) createWorkers() {
           wg.Add(1)
           m.f(wg)
           wg.Wait()
+          p.enqueueWorker(w)
           p.decrementCount()
         }
       }(w)
@@ -74,6 +85,7 @@ func CreatePool(size int) *Pool {
     Count:             0,
     RoundRobinCounter: size + 1,
     once:              &sync.Once{},
+    readyWorkers:      NewDoublyLinkedList(),
   }
 
   p.createWorkers()
@@ -84,23 +96,40 @@ func CreatePool(size int) *Pool {
 func (p *Pool) Run(z func(*sync.WaitGroup)) {
 
   p.mtx.Lock()
-  //     pool_test.go:14: Alloc: 261 MB, TotalAlloc: 727 MB, Sys: 1457 MB
+  // pool_test.go:14: Alloc: 261 MB, TotalAlloc: 727 MB, Sys: 1457 MB
 
-  if p.Count >= p.Size+10 {
-    //fmt.Println("unlocked 0")
-    p.mtx.Unlock()
-    // queue is pretty full, so just create a new goroutine here
-    go z(nil)
-    return
+  //if p.Count >= p.Size+100 {
+  //  p.NewGRCount++
+  //  p.mtx.Unlock()
+  //  // queue is pretty full, so just create a new goroutine here
+  //  go z(nil)
+  //  return
+  //}
+
+  if p.Count > p.Size {
+    panic("should not happen")
   }
 
   var m = &ChanMessage{
     f: z,
   }
 
+  if b, err := p.readyWorkers.Dequeue(); err == nil {
+    p.mtx.Unlock()
+    select {
+    case b.c <- m:
+      p.FreeWorkerCount++
+      return
+    default:
+      p.mtx.Lock()
+    }
+  }
+
+  //TODO make a queue of workers where the ready ones are at front of list
   for _, v := range p.workers {
     select {
     case v.c <- m:
+      p.FreeWorkerCount++
       p.mtx.Unlock()
       return
     default:
@@ -111,6 +140,7 @@ func (p *Pool) Run(z func(*sync.WaitGroup)) {
   // couldn't find a non-busy one, so just round robin to next
   p.RoundRobinCounter = (p.RoundRobinCounter + 1) % p.Size
   var v = p.workers[p.RoundRobinCounter]
+  p.RRCount++
   p.mtx.Unlock()
 
   go func() {
