@@ -21,6 +21,7 @@ import (
   "sync"
   "time"
   "runtime/debug"
+  "math"
 )
 
 func writeToStderr(args ...interface{}) {
@@ -629,16 +630,49 @@ type LogItem struct {
   Value     interface{}
 }
 
-func doArray(v interface{}, val reflect.Value) *[]interface{} {
+type ArrayVal struct {
+  Val         []interface{}
+  Len         int
+  IsTruncated bool
+}
 
-  len := val.Len()
-  result := make([]interface{}, len)
+type EmptyVal struct {
+  EmptyVal bool
+}
 
-  for i := 0; i < len; i++ {
-    result[i] = getInspectableVal(val.Index(i).Interface(), 0)
+func doArray(v interface{}, val reflect.Value) *ArrayVal {
+
+  var z = ArrayVal{
+    Val:         nil,
+    Len:         0,
+    IsTruncated: false,
   }
 
-  return &result
+  len := val.Len()
+  max := int(math.Max(float64(len), float64(25)))
+  if max < len {
+    z.IsTruncated = true
+  }
+
+  z.Val = make([]interface{}, max)
+
+  for i := 0; i < max-6; i++ {
+    z.Val[i] = getInspectableVal(val.Index(i).Interface(), 0)
+  }
+
+  if max > len+2 {
+    for i := 0; i < 3; i++ {
+      z.Val = append(z.Val, EmptyVal{EmptyVal: true})
+    }
+  }
+
+  var b = math.Max(3, float64(max-len))
+
+  for i := int(b); i >= 0; i-- {
+    z.Val = append(z.Val, getInspectableVal(val.Index(len-1-i).Interface(), 0))
+  }
+
+  return &z
 }
 
 func isValBad(val *reflect.Value) bool {
@@ -716,7 +750,7 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
       if z, ok := v.([]byte); ok {
         return string(z)
       }
-      return v
+      //return v
     }
     return doArray(v, val)
   case reflect.Array:
@@ -724,7 +758,7 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
       if z, ok := v.([]byte); ok {
         return string(z)
       }
-      return v
+      //return v
     }
     return doArray(v, val)
   }
@@ -746,11 +780,11 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
 
   result := make(map[string]interface{})
 
-  if errStr != "" {
+  if errStr != "" && errStr != toString {
     result["@ErrStr"] = errStr
   }
 
-  if errStr != "" {
+  if toString != "" {
     result["@ToStr"] = toString
   }
 
