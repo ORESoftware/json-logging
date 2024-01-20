@@ -651,6 +651,7 @@ type EmptyVal struct {
 func doMap(v interface{}, val reflect.Value) *MapVal {
 
   var z = MapVal{
+    GoType:       "<unknown>",
     TrueKeyCount: 0,
     IsTruncated:  false,
     Val:          nil,
@@ -658,6 +659,7 @@ func doMap(v interface{}, val reflect.Value) *MapVal {
 
   len := val.Len()
   z.TrueKeyCount = len
+  z.GoType = val.Type().String()
 
   keys := val.MapKeys()
 
@@ -715,7 +717,7 @@ func doArray(v interface{}, val reflect.Value) *ArrayVal {
 
   for i := 0; i < min; i++ {
     el := val.Index(i)
-    z.GoType = fmt.Sprintf("%v", el.Type())
+    z.GoType = fmt.Sprintf("%s", el.Type().String())
     if el.IsValid() {
       inf := el.Interface()
       //z.GoType = fmt.Sprintf("%T", inf)
@@ -1057,7 +1059,7 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int) interface{}
       continue
     }
 
-    innerResult[fieldName] = fmt.Sprintf("%v (%s) (Type: %T)", field, field.String(), field.Type())
+    innerResult[fieldName] = fmt.Sprintf("%v (%s) (Type: %s)", field, field.String(), field.Type().String())
     continue
   }
 
