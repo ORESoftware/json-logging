@@ -178,7 +178,7 @@ func handleSliceAndArray(v interface{}, len int, brk bool, depth int, cache *map
     //if x.IsValid() {
     //
     //}
-    b.WriteString(getStringRepresentation(inf, &inf, len, brk, depth, cache))
+    b.WriteString(getStringRepresentation(inf, len, brk, depth, cache))
     b.WriteString(addComma(i, n))
   }
 
@@ -238,13 +238,13 @@ func HandleStruct(v interface{}, size int, brk bool, depth int, cache *map[*inte
     rf := rs.Field(i)
 
     var v interface{}
-    var ptr interface{}
+    //var ptr interface{}
 
     if rf.CanAddr() {
       // It's safe to use UnsafeAddr and NewAt since rf is addressable
       rf = reflect.NewAt(rf.Type(), unsafe.Pointer(rf.UnsafeAddr())).Elem()
       v = rf.Interface()
-      ptr = rf.Addr().Interface()
+      //ptr = rf.Addr().Interface()
     } else {
       // Handle the case where rf is not addressable
       // You might need to create a copy or take a different approach
@@ -252,11 +252,11 @@ func HandleStruct(v interface{}, size int, brk bool, depth int, cache *map[*inte
       myCopy := reflect.New(rf.Type()).Elem()
       myCopy.Set(rf)
       v = myCopy.Interface()
-      ptr = myCopy.Addr().Interface()
+      //ptr = myCopy.Addr().Interface()
     }
 
     //v := fv.Interface()
-    z := getStringRepresentation(&v, &ptr, size, brk, depth+1, cache)
+    z := getStringRepresentation(v, size, brk, depth+1, cache)
 
     values = append(values, z)
     size = size + len(z)
@@ -400,7 +400,7 @@ func getHighlightedString(val string) string {
   return aurora.Bold("'").String() + aurora.Green(val).String() + aurora.Bold("'").String()
 }
 
-func getStringRepresentation(v interface{}, pt *interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) (s string) {
+func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) (s string) {
 
   defer func() {
     if r := recover(); r != nil {
@@ -410,6 +410,8 @@ func getStringRepresentation(v interface{}, pt *interface{}, size int, brk bool,
       s = fmt.Sprintf("%v - (go: unknown type 2: '%v')", r, v)
     }
   }()
+
+  pt := &v
 
   if &v != pt {
     panic("must be pointer to same object")
@@ -573,7 +575,7 @@ func getStringRepresentation(v interface{}, pt *interface{}, size int, brk bool,
     }
 
     myInf := rv.Interface()
-    return getStringRepresentation(myInf, &myInf, size, brk, depth, cache)
+    return getStringRepresentation(myInf, size, brk, depth, cache)
   }
 
   if rv.Kind() == reflect.Ptr {
@@ -817,7 +819,7 @@ func CopyAndDereference(s interface{}) interface{} {
 
 func GetPrettyString(v interface{}, size int) string {
   var cache = make(map[*interface{}]string)
-  return getStringRepresentation(v, &v, size, false, 2, &cache)
+  return getStringRepresentation(v, size, false, 2, &cache)
 }
 
 type Cache = *map[*interface{}]*interface{}
