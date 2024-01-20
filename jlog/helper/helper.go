@@ -25,48 +25,63 @@ func addComma(i int, n int) string {
 
 func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) string {
 
-  var m = reflect.ValueOf(x)
+  var rv = reflect.ValueOf(x)
 
-  if !m.IsValid() {
-    return "<nil>"
+  if !rv.IsValid() {
+    return fmt.Sprintf("<nil> (Type: %T)", x)
   }
 
-  keys := m.MapKeys()
+  keys := rv.MapKeys()
   n := len(keys)
 
   if n < 1 {
-    return fmt.Sprintf(aurora.Black("(empty %T)").String(), x)
+    return fmt.Sprintf(aurora.Black("(empty map - %T)").String(), x)
   }
 
   values := []string{}
 
   for i, k := range keys {
 
-    val := m.MapIndex(k)
+    val := rv.MapIndex(k)
     m := val.Interface()
     var ptr uintptr
 
     if val.Kind() == reflect.Ptr {
+      if val.IsNil() {
+        return fmt.Sprintf("<nil> (%T)", m)
+      }
       val = val.Elem()
       m = val.Interface()
     }
 
     if val.Kind() == reflect.Interface {
+      if val.IsNil() {
+        return fmt.Sprintf("<nil> (%T)", m)
+      }
       val = val.Elem()
       m = val.Interface()
     }
 
     if val.Kind() == reflect.Ptr {
+      if val.IsNil() {
+        return fmt.Sprintf("<nil> (%T)", m)
+      }
       val = val.Elem()
       m = val.Interface()
     }
 
     if val.Kind() == reflect.Interface {
+      if val.IsNil() {
+        return fmt.Sprintf("<nil> (%T)", m)
+      }
       val = val.Elem()
       m = val.Interface()
     }
 
     if val.Kind() == reflect.Ptr {
+      if val.IsNil() {
+        return fmt.Sprintf("<nil> (%T)", m)
+      }
       val = val.Elem()
       m = val.Interface()
     }
@@ -117,7 +132,7 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
       z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
       z.WriteString(aurora.Bold(" —> ").String())
       z.WriteString(fmt.Sprintf("%T %+v %+v %v", ptr, val, m, val.String()))
-      //z.WriteString(fmt.Sprintf(" 222 %v -- %v -- %v", m, val.String(), val.Interface()))
+      //z.WriteString(fmt.Sprintf(" 222 %v -- %v -- %v", rv, val.String(), val.Interface()))
       z.WriteString(addComma(i, n))
     } else {
       z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
@@ -139,7 +154,7 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
   }
 
   //keyType := reflect.ValueOf(keys).Type().Elem().String()
-  //valType := m.Type().Elem().String()
+  //valType := rv.Type().Elem().String()
   //z := fmt.Sprintf("map<%s,%s>(", keyType, valType)
   //log.Println(z)
 
@@ -224,9 +239,9 @@ func createSpaces(n int, brk bool) string {
   return b.String()
 }
 
-func HandleStruct(v interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) string {
+func handleStruct(obj interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) string {
 
-  rv := reflect.ValueOf(v)
+  rv := reflect.ValueOf(obj)
 
   if rv.IsValid() {
     return "<nil>"
@@ -246,7 +261,8 @@ func HandleStruct(v interface{}, size int, brk bool, depth int, cache *map[*inte
 
   for i := 0; i < n; i++ {
 
-    k := t.Field(i).Name
+    var fv = t.Field(i)
+    var k = fv.Name
 
     keys = append(keys, k+":")
     size = size + len(keys)
@@ -256,8 +272,11 @@ func HandleStruct(v interface{}, size int, brk bool, depth int, cache *map[*inte
     rf := rs.Field(i)
 
     var v interface{}
-    //var ptr interface{}
 
+    // TODO: we don't need to store in an array;
+    // we can just flip a bool if the total size of string is more than (size + line) > 50
+    // we could reset the bool once we start a new line
+    //
     if rf.CanAddr() {
       // It's safe to use UnsafeAddr and NewAt since rf is addressable
       rf = reflect.NewAt(rf.Type(), unsafe.Pointer(rf.UnsafeAddr())).Elem()
@@ -273,17 +292,12 @@ func HandleStruct(v interface{}, size int, brk bool, depth int, cache *map[*inte
       //ptr = myCopy.Addr().Interface()
     }
 
-    //v := fv.Interface()
     z := getStringRepresentation(v, size, brk, depth+1, cache)
 
     values = append(values, z)
     size = size + len(z)
 
-    //log.Println("m:", ln)
-    //s += createSpaces(depth, brk) + z + addComma(i, n) + createNewline(brk, true)
   }
-
-  //log.Println("size:", size, "n:", n)
 
   if size > 100-depth {
     brk = true
@@ -646,7 +660,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
   }
 
   if kind == reflect.Struct {
-    return HandleStruct(v, size, brk, depth, cache)
+    return handleStruct(v, size, brk, depth, cache)
   }
 
   if z, ok := v.(Stringer); ok && z != nil {
@@ -778,7 +792,14 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 }
 
 func DoCopyAndDerefStruct(s interface{}) interface{} {
-  val := reflect.ValueOf(s).Elem()
+
+  rv := reflect.ValueOf(s)
+
+  if !rv.IsValid() {
+    return nil
+  }
+
+  val := rv.Elem()
   newStruct := reflect.New(val.Type()).Elem()
 
   for i := 0; i < val.NumField(); i++ {
@@ -798,8 +819,12 @@ func CopyAndDereference(s interface{}) interface{} {
   // // get reflect value
   val := reflect.ValueOf(s)
 
+  if !val.IsValid() {
+    return nil
+  }
+
   // Dereference pointer if s is a pointer
-  if val.Kind() == reflect.Ptr {
+  if val.Kind() == reflect.Ptr || val.Kind() == reflect.Interface {
     if val.IsNil() {
       return nil
     }
@@ -817,7 +842,13 @@ func CopyAndDereference(s interface{}) interface{} {
     slice := make([]interface{}, n)
     for i := 0; i < n; i++ {
       // Recursively copy and dereference each element in the slice or array
-      slice[i] = CopyAndDereference(val.Index(i).Interface())
+      rv := val.Index(i)
+      if rv.IsValid() && rv.CanInterface() {
+        slice[i] = CopyAndDereference(val.Index(i).Interface())
+      } else {
+        slice[i] = fmt.Sprintf("%v (%s)", rv, rv.String())
+      }
+
     }
     return slice
   }
@@ -913,52 +944,41 @@ func cleanStructWorks(val reflect.Value, cache Cache) interface{} {
   return newStruct.Interface()
 }
 
-func cleanStruct(v *interface{}, cache Cache) interface{} {
+func cleanStruct(v interface{}, cache Cache) interface{} {
 
-  val := reflect.ValueOf(*v)
+  rv := reflect.ValueOf(v)
+
+  if !rv.IsValid() {
+    return nil
+  }
+
   // we turn struct into a map so we can display
   var ret = map[string]interface{}{}
 
-  if val.Elem().Kind() != reflect.Struct {
-    z := val.Elem().Addr()
-    if x, ok := (z.Interface()).(interface{}); ok {
-      v = &x
-    }
-  }
-  //val := val.Elem() // Dereference the pointer to get the struct
+  //if rv.Elem().Kind() != reflect.Struct {
+  //  z := rv.Elem().Addr()
+  //  if x, ok := (z.Interface()).(interface{}); ok {
+  //    v = &x
+  //  }
+  //}
+  //rv := rv.Elem() // Dereference the pointer to get the struct
 
-  for i := 0; i < val.NumField(); i++ {
-    fieldVal := val.Field(i)
-    fieldType := val.Type()     // Get the reflect.Type of the struct
-    field := fieldType.Field(i) // Get the reflect.StructField
-    itff := fieldVal.Interface()
+  for i := 0; i < rv.NumField(); i++ {
 
-    if fieldVal.Kind() == reflect.Ptr || fieldVal.Kind() == reflect.Interface {
+    fv := rv.Field(i)
+    ft := rv.Type()      // Get the reflect.Type of the struct
+    field := ft.Field(i) // Get the reflect.StructField
 
-      if !fieldVal.IsNil() {
-        //ret[field.Name] = "(pointer)"
-        //continue
-        // Create a new instance of the type that the pointer points to
-        newPtr := reflect.New(fieldVal.Elem().Type())
-
-        // Recursively copy the value and get a reflect.Value
-        copiedVal := reflect.ValueOf(CleanUp(&itff, cache))
-
-        // Set the copied value to the new pointer
-        newPtr.Elem().Set(copiedVal)
-        intf := copiedVal.Interface()
-
-        //// Set the new pointer to the field
-        //newStruct.Field(i).Set(newPtr)
-        ret[field.Name] = CleanUp(&intf, cache)
-      } else {
-        ret[field.Name] = "(nil pointer)"
-      }
-
-    } else {
-      ret[field.Name] = CleanUp(&itff, cache)
+    if !fv.IsValid() {
+      continue
     }
 
+    if !fv.CanInterface() {
+      ret[field.Name] = fmt.Sprintf("(%v) (%v)", ft.String(), fv.String())
+      continue
+    }
+
+    ret[field.Name] = CleanUp(fv.Interface(), cache)
   }
 
   // Iterate over each field and copy
@@ -994,7 +1014,7 @@ func cleanStructOld(val reflect.Value) (z interface{}) {
 
 }
 
-func cleanMap(v *interface{}, cache Cache) (z interface{}) {
+func cleanMap(v interface{}, cache Cache) (z interface{}) {
 
   // TODO: if keys to map are not strings, then create a slice/array of Key/Value Structs
   //type KeyValuePair struct {
@@ -1002,7 +1022,7 @@ func cleanMap(v *interface{}, cache Cache) (z interface{}) {
   //	Value string `json:"value"`
   //}
 
-  m := reflect.ValueOf(*v)
+  m := reflect.ValueOf(v)
 
   var ret = make(map[interface{}]interface{})
   keys := m.MapKeys()
@@ -1016,10 +1036,9 @@ func cleanMap(v *interface{}, cache Cache) (z interface{}) {
   return ret
 }
 
-func cleanList(v *interface{}, cache Cache) (z interface{}) {
+func cleanList(v interface{}, cache Cache) (z interface{}) {
 
   val := reflect.ValueOf(v)
-
   var ret = []interface{}{}
 
   for i := 0; i < val.Len(); i++ {
@@ -1043,171 +1062,122 @@ func isNonComplexNum(kind reflect.Kind) bool {
     kind == reflect.Uint64
 }
 
-func CleanUp(v *interface{}, cache Cache) (z interface{}) {
+func CleanUp(v interface{}, cache Cache) (z interface{}) {
 
-  // TODO: this is not really working
+  rv := reflect.ValueOf(v)
 
-  val := reflect.ValueOf(v)
-  originalV := v
-
-  //if (*cache)[v] != nil {
-  //	return fmt.Sprintf("pointer 1: %+v", v)
-  //}
-  //
-  //(*cache)[v] = new(interface{})
-
-  // https://chat.openai.com/share/2113eb47-c685-48f1-81d1-96c4956f4ea5
-
-  /*
-
-  	In Go, json.Marshal returns an error in a few specific scenarios where the data structure provided to it cannot be serialized into JSON. These scenarios include:
-
-  	Unsupported Types: Go's json package does not support the serialization of certain types. If you try to marshal channels, functions, or complex numbers, json.Marshal will return an error.
-
-  	Cyclic References: If the data structure contains cyclic references (i.e., a struct that directly or indirectly references itself), json.Marshal will return an error. JSON cannot represent cyclic data structures.
-
-  	Invalid UTF-8 Strings: If a string or a slice of bytes contains invalid UTF-8 sequences and is set to be marshaled into a JSON string, json.Marshal may return an error since JSON strings must be valid UTF-8.
-
-  	Marshaler Errors: If a type implements the json.Marshaler interface and its MarshalJSON method returns an error, json.Marshal will propagate that error.
-
-  	Pointer to Uninitialized Struct: If you pass a pointer to an uninitialized struct (a nil pointer), json.Marshal will return an error.
-
-  	Large Floating-Point Values: Extremely large floating-point values (like math.Inf or math.NaN) can cause json.Marshal to return an error, as they do not have a direct representation in JSON.
-
-  	Unsupported Map Key Types: In Go, a map can have keys of nearly any type, but JSON only supports string keys in objects. If you try to marshal a map with non-string keys (like map[int]string), json.Marshal will return an error.
-
-  	It's important to note that json.Marshal does not return an error for marshaling private (unexported) struct fields. Instead, it silently ignores them. To include private fields in the JSON output, you either need to export these fields (make their first letter uppercase) or provide a custom marshaling method.
-
-  	Understanding these conditions can help in ensuring that the data structures used with json.Marshal are compatible with JSON's serialization requirements.
-
-
-  */
-
-  kind := val.Kind()
-
-  //if kind == reflect.Pointer {
-  //	(*cache)[&v] = new(interface{})
-  //}
-
-  //originalV := v
-
-  if kind == reflect.Pointer || kind == reflect.Interface {
-    val = val.Elem()
-    kind = val.Kind()
+  if !rv.IsValid() {
+    return nil
   }
 
-  if kind == reflect.Pointer || kind == reflect.Interface {
-    val = val.Elem()
-    kind = val.Kind()
-  }
+  if rv.Kind() == reflect.Pointer || rv.Kind() == reflect.Interface {
 
-  if kind == reflect.Ptr || kind == reflect.Interface {
-    val = val.Elem()
-    kind = val.Kind()
-
-    if kind == reflect.Ptr || kind == reflect.Interface {
-      // This block will not run for structInstance
-      if val.Elem().CanAddr() {
-        ptrVal := val.Elem().Addr()
-        // Convert to interface and then to the specific pointer type (*int in this case)
-        ptr, ok := ptrVal.Interface().(interface{})
-        if ok {
-          v = &ptr
-        } else {
-          return "(pointer thing 5)"
-        }
-      } else {
-        return "(pointer thing 6)"
-      }
+    if rv.IsNil() {
+      return nil
+    }
+    if !rv.IsValid() {
+      return nil
     }
 
+    rv = rv.Elem()
+
+    if !rv.IsValid() {
+      return nil
+    }
+
+    return CleanUp(rv.Interface(), cache)
   }
+
+  //if rv.Kind() == reflect.Ptr || kind == reflect.Interface {
+  //  rv = rv.Elem()
+  //  kind = rv.Kind()
+  //
+  //  if kind == reflect.Ptr || kind == reflect.Interface {
+  //    // This block will not run for structInstance
+  //    if rv.Elem().CanAddr() {
+  //      ptrVal := rv.Elem().Addr()
+  //      // Convert to interface and then to the specific pointer type (*int in this case)
+  //      ptr, ok := ptrVal.Interface().(interface{})
+  //      if ok {
+  //        v = &ptr
+  //      } else {
+  //        return "(pointer thing 5)"
+  //      }
+  //    } else {
+  //      return "(pointer thing 6)"
+  //    }
+  //  }
+  //
+  //}
 
   if v == nil {
     return fmt.Sprintf("<nil> (%T)", v)
   }
 
-  if kind == reflect.Pointer || val.Kind() == reflect.Interface {
-    // Use Elem() to get the underlying type
+  //if rv.Kind() == reflect.Pointer || rv.Kind() == reflect.Interface {
+  //  // Use Elem() to get the underlying type
+  //  rv = rv.Elem()
+  //  v = rv.Interface()
+  //
+  //  // Check again if the concrete value is also an interface
+  //  if rv.Kind() == reflect.Interface {
+  //    // Get type information about the interface
+  //    typ := rv.Type()
+  //
+  //    // You can also check if the interface is nil
+  //    if rv.IsNil() {
+  //      return fmt.Sprintf("Nested interface type: %v, but it is nil", typ)
+  //    } else {
+  //      // Get more information about the non-nil interface
+  //      concreteVal := rv.Elem()
+  //      concreteType := concreteVal.Type()
+  //      return fmt.Sprintf("Nested interface type: %v, contains value of type: %v", typ, concreteType)
+  //    }
+  //  }
+  //}
 
-    val = val.Elem()
-    kind = val.Kind()
-    //v = val.Interface()
-
-    // Check again if the concrete value is also an interface
-    if val.Kind() == reflect.Interface {
-      // Get type information about the interface
-      typ := val.Type()
-
-      // You can also check if the interface is nil
-      if val.IsNil() {
-        return fmt.Sprintf("Nested interface type: %v, but it is nil", typ)
-      } else {
-        // Get more information about the non-nil interface
-        concreteVal := val.Elem()
-        concreteType := concreteVal.Type()
-        return fmt.Sprintf("Nested interface type: %v, contains value of type: %v", typ, concreteType)
-      }
-    }
-  }
-
-  if originalV != v && &originalV != &v {
-    if (*cache)[v] != nil {
-      return fmt.Sprintf("pointer 2: %+v", v)
-    }
-
-    (*cache)[v] = new(interface{})
-  }
-
-  if kind == reflect.Bool {
+  if rv.Kind() == reflect.Bool {
     return v
   }
 
-  if isNonComplexNum(kind) {
+  if isNonComplexNum(rv.Kind()) {
     return v
   }
 
-  if kind == reflect.Func {
+  if rv.Kind() == reflect.Func {
     return "(go:func())"
   }
 
-  if kind == reflect.Complex64 {
+  if rv.Kind() == reflect.Complex64 {
     return fmt.Sprintf("(go:complex64:%+v)", v) // v.(complex64)
   }
 
-  if kind == reflect.Complex128 {
+  if rv.Kind() == reflect.Complex128 {
     return "(go:complex128)" //v.(complex128)
   }
 
-  if kind == reflect.Chan {
+  if rv.Kind() == reflect.Chan {
     return fmt.Sprintf("(go:chan:%+v)", v)
   }
 
-  if kind == reflect.UnsafePointer {
+  if rv.Kind() == reflect.UnsafePointer {
     return "(go:UnsafePointer)"
   }
 
-  if kind == reflect.Interface {
-    //return copyStruct(v, cache)
-    //actualValue := val.Elem()
-    //t := actualValue.Type(
-    return "inf Interface type"
-  }
-
-  if kind == reflect.Struct {
+  if rv.Kind() == reflect.Struct {
     //panic("here")
     //return copyStruct(v, cache)
-    //actualValue := val.Elem()
+    //actualValue := rv.Elem()
     //t := actualValue.Type()
     //if t.Kind() != reflect.Interface {
     //	intf := actualValue.Interface()
     //	return cleanUp(intf, cache)
     //}
-    //fmt.Println(val)
+    //fmt.Println(rv)
     return cleanStruct(v, cache)
   }
 
-  if kind == reflect.Map {
+  if rv.Kind() == reflect.Map {
     // TODO: if keys to map are not strings, then create a slice/array of Key/Value Structs
     //type KeyValuePair struct {
     //	Key   int    `json:"key"`
@@ -1216,19 +1186,19 @@ func CleanUp(v *interface{}, cache Cache) (z interface{}) {
     return cleanMap(v, cache)
   }
 
-  if kind == reflect.Slice {
+  if rv.Kind() == reflect.Slice {
     return cleanList(v, cache)
   }
 
-  if kind == reflect.Array {
+  if rv.Kind() == reflect.Array {
     return cleanList(v, cache)
   }
 
-  if z, ok := (*v).(Stringer); ok {
+  if z, ok := (v).(Stringer); ok {
     return z.String()
   }
 
-  if z, ok := (*v).(ToString); ok {
+  if z, ok := (v).(ToString); ok {
     return z.ToString()
   }
 

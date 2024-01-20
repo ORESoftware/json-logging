@@ -1,4 +1,7 @@
 
+1. instead of storing objects in cache of pointers,
+  add a brand field to an object to mark as visited
+
 1. if it's a reflect.Ptr
 return "ptr (xxxx) -> " + getPrettyString(*deref)
 
