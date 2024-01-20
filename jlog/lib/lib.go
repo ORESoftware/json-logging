@@ -632,7 +632,7 @@ type LogItem struct {
 
 type ArrayVal struct {
   Val         []interface{}
-  Len         int
+  TrueLen     int
   IsTruncated bool
 }
 
@@ -644,33 +644,39 @@ func doArray(v interface{}, val reflect.Value) *ArrayVal {
 
   var z = ArrayVal{
     Val:         nil,
-    Len:         0,
+    TrueLen:     0,
     IsTruncated: false,
   }
 
   len := val.Len()
-  max := int(math.Max(float64(len), float64(25)))
-  if max < len {
+  z.TrueLen = len
+
+  min := int(math.Min(float64(len), float64(25)))
+  if min < len {
     z.IsTruncated = true
   }
 
-  z.Val = make([]interface{}, max)
+  z.Val = make([]interface{}, min)
 
-  for i := 0; i < max-6; i++ {
-    z.Val[i] = getInspectableVal(val.Index(i).Interface(), 0)
-  }
-
-  if max > len+2 {
-    for i := 0; i < 3; i++ {
-      z.Val = append(z.Val, EmptyVal{EmptyVal: true})
+  for i := 0; i < min; i++ {
+    el := val.Index(i)
+    if el.IsValid() {
+      z.Val[i] = getInspectableVal(el.Interface(), 0)
+    } else {
+      // Handle the case where the value is nil
+      z.Val[i] = nil // or any default value you want
     }
   }
 
-  var b = math.Max(3, float64(max-len))
-
-  for i := int(b); i >= 0; i-- {
-    z.Val = append(z.Val, getInspectableVal(val.Index(len-1-i).Interface(), 0))
-  }
+  //for i := 0; i < 3; i++ {
+  //  z.Val = append(z.Val, EmptyVal{EmptyVal: true})
+  //}
+  //
+  //var b = math.Max(3, float64(min-len))
+  //
+  //for i := int(b); i >= 0; i-- {
+  //  z.Val = append(z.Val, getInspectableVal(val.Index(len-1-i).Interface(), 0))
+  //}
 
   return &z
 }
@@ -701,6 +707,12 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
   v := val.Interface()
 
   if val.Kind() == reflect.Ptr {
+
+    if val.IsNil() {
+      // Handle nil interface value
+      return nil
+    }
+
     val = val.Elem()
 
     if isValBad(&val) {
