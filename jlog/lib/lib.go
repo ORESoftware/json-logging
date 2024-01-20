@@ -747,6 +747,12 @@ type VibeInspectBool interface {
   ToBool() bool
 }
 
+type UnkVal struct {
+  GoType   string
+  Val      interface{}
+  ValAsStr string
+}
+
 func getInspectableVal(obj interface{}, depth int) interface{} {
   ///
   var rv = reflect.ValueOf(obj)
@@ -757,6 +763,10 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
   }
 
   var v = rv.Interface()
+
+  if v == nil {
+    return v
+  }
 
   if rv.Kind() == reflect.Ptr {
 
@@ -890,12 +900,20 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
   }
 
   if rv.Kind() != reflect.Struct {
-    // if it's a Map, it can
-    return v
+    // if it's a not a struct now
+    var str = fmt.Sprintf("%v", v)
+    var t = fmt.Sprintf("%T", v)
+    return &UnkVal{
+      GoType:   t,
+      Val:      v,
+      ValAsStr: str,
+    }
   }
 
+  // it's a struct, so we can add metadata to it
   var errStr = ""
   var toString = ""
+  var typeStr = fmt.Sprintf("%T", v)
 
   if z, ok := v.(error); ok {
     errStr = z.Error()
@@ -905,15 +923,22 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
     toString = z.String()
   }
 
-  result := make(map[string]interface{})
+  outResult := make(map[string]interface{})
 
-  if errStr != "" && errStr != toString {
-    result["@ErrStr"] = errStr
+  if typeStr != "" {
+    outResult["@GoType"] = typeStr
   }
 
-  if toString != "" {
-    result["@ToStr"] = toString
+  if errStr != "" {
+    outResult["@ErrStr"] = errStr
   }
+
+  if toString != "" && toString != errStr {
+    outResult["@ToStr"] = toString
+  }
+
+  innerResult := make(map[string]interface{})
+  outResult["@Val"] = innerResult
 
   typ := rv.Type()
 
@@ -922,41 +947,101 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
     field := rv.Field(i)
     fieldName := typ.Field(i).Name
 
-    if field.Kind() == reflect.Ptr {
-      field = field.Elem()
-    }
-
-    if !(field.IsValid() && field.CanInterface()) {
-      result[fieldName] = fmt.Sprintf("%v (%s)", field, field.String())
+    if !field.IsValid() {
+      innerResult[fieldName] = nil
       continue
     }
 
-    //inf := field.Interface()
-    //var errStr = ""
-    //var toString = ""
-    //
-    //if z, ok := inf.(error); ok {
-    //  errStr = z.Error()
-    //}
-    //
-    //if z, ok := inf.(Stringer); ok {
-    //  toString = z.String()
-    //}
+    if field.Kind() == reflect.Ptr {
+      field = field.Elem()
 
-    result[fieldName] = getInspectableVal(field.Interface(), depth+1)
+      if field.IsNil() {
+        innerResult[fieldName] = nil
+        continue
+      }
 
-    //if errStr == "" && toString == "" {
-    //  result[fieldName] = inf
-    //} else {
-    //  result[fieldName] = LogItem{
-    //    AsString:  toString,
-    //    ErrString: errStr,
-    //    Value:     inf,
-    //  }
-    //}
+      if !field.IsValid() {
+        innerResult[fieldName] = nil
+        continue
+      }
+
+    }
+
+    if field.Kind() == reflect.Interface {
+
+      if field.IsNil() {
+        innerResult[fieldName] = nil
+        continue
+      }
+
+      field = field.Elem()
+
+      if !field.IsValid() {
+        innerResult[fieldName] = nil
+        continue
+      }
+    }
+
+    if field.Kind() == reflect.Ptr {
+      field = field.Elem()
+
+      if field.IsNil() {
+        innerResult[fieldName] = nil
+        continue
+      }
+
+      if !field.IsValid() {
+        innerResult[fieldName] = nil
+        continue
+      }
+
+    }
+
+    if field.Kind() == reflect.Interface {
+
+      if field.IsNil() {
+        innerResult[fieldName] = nil
+        continue
+      }
+
+      field = field.Elem()
+
+      if !field.IsValid() {
+        innerResult[fieldName] = nil
+        continue
+      }
+    }
+
+    if field.Kind() == reflect.Ptr {
+      field = field.Elem()
+
+      if field.IsNil() {
+        innerResult[fieldName] = nil
+        continue
+      }
+
+      if !field.IsValid() {
+        innerResult[fieldName] = nil
+        continue
+      }
+
+    }
+
+    if !field.IsValid() {
+      innerResult[fieldName] = nil
+      continue
+    }
+
+    if field.CanInterface() {
+      innerResult[fieldName] = getInspectableVal(field.Interface(), depth+1)
+      continue
+    }
+
+    innerResult[fieldName] = fmt.Sprintf("%v (%s)", field, field.String())
+    continue
   }
 
-  return result
+  return outResult
 }
 
 func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{}) {
