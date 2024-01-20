@@ -23,7 +23,13 @@ func addComma(i int, n int) string {
   return ""
 }
 
-func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, cache *map[*interface{}]string) string {
+func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) string {
+
+  var m = reflect.ValueOf(x)
+
+  if !m.IsValid() {
+    return "<nil>"
+  }
 
   keys := m.MapKeys()
   n := len(keys)
@@ -32,19 +38,11 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, ca
     return fmt.Sprintf(aurora.Black("(empty %T)").String(), x)
   }
 
-  //s := createSpaces(depth, brk) + aurora.Bold("map(").String() + createNewline(brk, true)
-
   values := []string{}
 
   for i, k := range keys {
 
     val := m.MapIndex(k)
-
-    //z := getStringRepresentation(k.Interface(), nil, size, brk, depth+1, cache) +
-    //	" => " +
-    //	getStringRepresentation(val.Interface(), nil, size, brk, depth+1, cache) +
-    //	addComma(i, n)
-
     m := val.Interface()
     var ptr uintptr
 
@@ -54,6 +52,11 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, ca
     }
 
     if val.Kind() == reflect.Interface {
+      val = val.Elem()
+      m = val.Interface()
+    }
+
+    if val.Kind() == reflect.Ptr {
       val = val.Elem()
       m = val.Interface()
     }
@@ -135,26 +138,25 @@ func handleMap(x interface{}, m reflect.Value, size int, brk bool, depth int, ca
   return b.String()
 }
 
-func handleSliceAndArray(vv *interface{}, val reflect.Value, len int, brk bool, depth int, cache *map[*interface{}]string) string {
+func handleSliceAndArray(v interface{}, len int, brk bool, depth int, cache *map[*interface{}]string) string {
 
-  n := val.Len()
-  t := val.Type()
+  rv := reflect.ValueOf(v)
+
+  if !rv.IsValid() {
+    return "<nil>"
+  }
+
+  n := rv.Len()
+  t := rv.Type()
 
   if n < 1 {
     return aurora.Black("[").String() + "" + aurora.Black(fmt.Sprintf("] (empty %v)", t)).String()
   }
 
-  // sliceType := reflect.TypeOf(vv)
-
-  //if val.Type() != sliceType {
-  //	panic(fmt.Sprintf("mismatched types: %v %v", val.Type(), sliceType))
-  //}
-
-  // Get the type of the elements in the slice
   elementType := t.Elem()
 
   if elementType.Kind() == reflect.Uint8 {
-    return aurora.Bold("[]byte as str:").String() + fmt.Sprintf(" '%s'", *vv)
+    return aurora.Bold("[]byte as str:").String() + fmt.Sprintf(" '%s'", v)
   }
 
   var b strings.Builder
@@ -162,16 +164,21 @@ func handleSliceAndArray(vv *interface{}, val reflect.Value, len int, brk bool, 
 
   for i := 0; i < n; i++ {
     b.WriteString(createSpaces(depth, brk))
-    x := val.Index(i)
-    val := x.Interface()
-    ptr := val
-    if x.CanAddr() {
-      ptr = x.Addr().Interface()
+    x := rv.Index(i)
+    if !x.IsValid() {
+      b.WriteString("<nil>")
+      continue
     }
+    inf := x.Interface()
+
+    //ptr := inf
+    //if x.CanAddr() {
+    //  ptr = x.Addr().Interface()
+    //}
     //if x.IsValid() {
     //
     //}
-    b.WriteString(getStringRepresentation(val, &ptr, len, brk, depth, cache))
+    b.WriteString(getStringRepresentation(inf, &inf, len, brk, depth, cache))
     b.WriteString(addComma(i, n))
   }
 
@@ -199,10 +206,16 @@ func createSpaces(n int, brk bool) string {
   return b.String()
 }
 
-func HandleStruct(val reflect.Value, size int, brk bool, depth int, cache *map[*interface{}]string) string {
+func HandleStruct(v interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) string {
 
-  n := val.NumField()
-  t := val.Type()
+  rv := reflect.ValueOf(v)
+
+  if rv.IsValid() {
+    return "<nil>"
+  }
+
+  n := rv.NumField()
+  t := rv.Type()
 
   if n < 1 {
     return fmt.Sprintf(" %s { }", t.Name())
@@ -221,7 +234,7 @@ func HandleStruct(val reflect.Value, size int, brk bool, depth int, cache *map[*
     size = size + len(keys)
 
     rs := reflect.New(t).Elem()
-    rs.Set(val)
+    rs.Set(rv)
     rf := rs.Field(i)
 
     var v interface{}
@@ -376,7 +389,18 @@ func getFormattedNilStr(str string) string {
   return aurora.Black(aurora.Bold("<nil>")).String()
 }
 
-func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) (s string) {
+func getHighlightedString(val string) string {
+  if len(val) < 1 {
+    return aurora.Bold("''").String()
+  }
+  var trimmed = strings.TrimSpace(val)
+  if len(trimmed) == len(val) {
+    return aurora.Green(val).String()
+  }
+  return aurora.Bold("'").String() + aurora.Green(val).String() + aurora.Bold("'").String()
+}
+
+func getStringRepresentation(v interface{}, pt *interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) (s string) {
 
   defer func() {
     if r := recover(); r != nil {
@@ -387,20 +411,226 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
     }
   }()
 
+  if &v != pt {
+    panic("must be pointer to same object")
+  }
+
+  if v == nil {
+    return "<nil>"
+  }
+
   if z, ok := v.(aurora.Value); ok && z != nil {
-    return z.String()
+    return getHighlightedString(z.String())
   }
 
   if z, ok := v.(*aurora.Value); ok && z != nil {
-    return (*z).String()
+    return getHighlightedString((*z).String())
   }
 
-  if z, ok := (*vv).(aurora.Value); ok && z != nil {
-    return (z).String()
+  if z, ok := v.(string); ok {
+    return getHighlightedString(z)
   }
 
-  if z, ok := (*vv).(*aurora.Value); ok && z != nil {
-    return (*z).String()
+  if z, ok := v.(*string); ok && z != nil {
+    return getHighlightedString(*z)
+  }
+
+  rv := reflect.ValueOf(v)
+
+  if rv.Kind() == reflect.Ptr && rv.IsNil() {
+    return fmt.Sprintf("<nil> (%v)", rv.Type())
+  }
+
+  originalV := v
+  originalVal := rv
+
+  var kind = rv.Kind()
+
+  if kind == reflect.Uintptr || kind == reflect.UnsafePointer || kind == reflect.Ptr {
+    //v = val.Elem().Interface()
+    //val = reflect.ValueOf(v)
+
+    if rv.IsNil() {
+      return "<nil>"
+    }
+
+    rv = rv.Elem()
+
+    if rv.IsValid() {
+      // Check if the dereferenced value is valid
+      v = rv.Interface()
+
+      if v == nil {
+        return "<nil>"
+      }
+
+      kind = rv.Kind()
+
+    } else {
+      return "<nil>"
+    }
+  }
+
+  if kind == reflect.Ptr {
+
+    if rv.IsNil() {
+      return "<nil>"
+    }
+
+    rv = rv.Elem()
+
+    if !rv.IsValid() { // Check if the dereferenced value is valid
+      return "<nil>"
+    }
+
+    v = rv.Interface()
+
+    if v == nil {
+      return "<nil>"
+    }
+
+    kind = rv.Kind()
+  }
+
+  if kind == reflect.Interface {
+
+    if rv.IsNil() {
+      return "<nil>"
+    }
+
+    rv = rv.Elem()
+
+    if !rv.IsValid() {
+      // Handle zero Value if necessary
+      return "<nil>"
+    }
+
+    v = rv.Interface()
+    kind = rv.Kind()
+  }
+
+  if kind == reflect.Ptr {
+    // Dereference the pointer
+
+    if rv.IsNil() {
+      return "<nil>"
+    }
+
+    rv = rv.Elem()
+
+    if !rv.IsValid() {
+      // Handle zero Value if necessary
+      return "<nil>"
+    }
+
+    kind = rv.Kind()
+    v = rv.Interface()
+  }
+
+  if v == nil {
+    return "<nil>"
+  }
+
+  if rv.Kind() == reflect.Ptr {
+
+    if rv.IsNil() {
+      return "<nil>"
+    }
+
+    rv = rv.Elem()
+
+    if !rv.IsValid() {
+      // Handle zero Value if necessary
+      return "<nil>"
+    }
+
+    kind = rv.Kind()
+    v = rv.Interface()
+  }
+
+  if rv.Kind() == reflect.Ptr {
+
+    rv = rv.Elem()
+
+    if !rv.IsValid() {
+      // Handle zero Value if necessary
+      return "<nil>"
+    }
+
+    kind = rv.Kind()
+    v = rv.Interface()
+
+    return fmt.Sprintf("<nil> (%v)", reflect.TypeOf(v).String())
+  }
+
+  if kind == reflect.Interface {
+
+    rv = rv.Elem()
+
+    if !rv.IsValid() {
+      // Handle zero Value if necessary
+      return "<nil>"
+    }
+
+    myInf := rv.Interface()
+    return getStringRepresentation(myInf, &myInf, size, brk, depth, cache)
+  }
+
+  if rv.Kind() == reflect.Ptr {
+
+    if rv.IsNil() {
+      return "<nil>"
+    }
+
+    rv = rv.Elem()
+
+    if !rv.IsValid() {
+      // Handle zero Value if necessary
+      return "<nil>"
+    }
+
+    kind = rv.Kind()
+    v = rv.Interface()
+  }
+
+  if rv.Kind() == reflect.Ptr {
+    return fmt.Sprintf("pointer <- pointer (%v)", rv.Type())
+  }
+
+  if z, ok := v.(string); ok {
+    return getHighlightedString(z)
+  }
+
+  if kind == reflect.Chan {
+    return fmt.Sprintf("(chan %s)", rv.Type().Elem().String())
+  }
+
+  if kind == reflect.Map {
+    return handleMap(v, size, brk, depth, cache)
+  }
+
+  if kind == reflect.Slice {
+    if m, ok := v.(Stringer); ok {
+      return fmt.Sprintf("%T - (As string: %s)", m)
+    } else {
+      return handleSliceAndArray(v, size, brk, depth, cache)
+    }
+  }
+
+  if kind == reflect.Array {
+    if m, ok := v.(Stringer); ok {
+      return fmt.Sprintf("(%T (As string: '%s'))", m)
+    } else {
+      return handleSliceAndArray(v, size, brk, depth, cache)
+    }
+  }
+
+  if kind == reflect.Func {
+    return GetFuncSignature(v)
+  }
+
+  if kind == reflect.Struct {
+    return HandleStruct(v, size, brk, depth, cache)
   }
 
   if z, ok := v.(Stringer); ok && z != nil {
@@ -410,256 +640,6 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
   if z, ok := v.(*Stringer); ok && z != nil {
     return (*z).String()
   }
-
-  if z, ok := (*vv).(Stringer); ok && z != nil {
-    return z.String()
-  }
-
-  if z, ok := (*vv).(*Stringer); ok && z != nil {
-    return (*z).String()
-  }
-
-  mutex.Lock()
-
-  if v, ok := (*cache)[vv]; ok {
-    // TODO: verify the caching logic
-    log.Println(aurora.Red("map cached used."))
-    mutex.Unlock()
-    return v
-  }
-
-  mutex.Unlock()
-
-  if v == nil {
-    return "<nil-2>"
-  }
-
-  rv := reflect.ValueOf(v)
-  if rv.Kind() == reflect.Ptr && rv.IsNil() {
-    return fmt.Sprintf("<nil> (%v)", rv.Type())
-  }
-
-  val := reflect.ValueOf(&v)
-
-  if !val.IsValid() {
-    return fmt.Sprintf("<nil-11> (%s)", reflect.TypeOf(v).Kind().String())
-  }
-
-  if val.Kind() == reflect.Ptr && val.IsNil() {
-    return fmt.Sprintf("<nil-111> (%v)", val.Type())
-  }
-
-  originalV := v
-  originalVal := val
-  var kind = val.Kind()
-
-  if kind == reflect.Uintptr || kind == reflect.UnsafePointer || kind == reflect.Ptr {
-    //v = val.Elem().Interface()
-    //val = reflect.ValueOf(v)
-
-    if val.IsNil() {
-      return "<nil-pointer>"
-    }
-
-    val = val.Elem()
-
-    if val.IsValid() { // Check if the dereferenced value is valid
-      v = val.Interface()
-
-      if v == nil {
-        return "<nil-8>"
-      }
-
-      val = reflect.ValueOf(v)
-      kind = val.Kind()
-
-    } else {
-      return "<nil-112>"
-    }
-  }
-
-  if kind == reflect.Ptr {
-    //v = val.Elem().Interface()
-    //val = reflect.ValueOf(v)
-
-    if val.IsNil() {
-      return "<nil-44>"
-    }
-
-    val = val.Elem()
-
-    if !val.IsValid() { // Check if the dereferenced value is valid
-      return "<nil-111>"
-    }
-
-    v = val.Interface()
-
-    if v == nil {
-      return "<nil-12>"
-    }
-
-    val = reflect.ValueOf(v)
-    kind = val.Kind()
-  }
-
-  if kind == reflect.Ptr {
-    // Dereference the pointer
-    val = reflect.ValueOf(v)
-    kind = val.Kind()
-    val = val.Elem()
-
-    if !val.IsValid() {
-      // Handle zero Value if necessary
-      return "<nil>"
-    }
-
-    v = val.Interface()
-    // Convert the dereferenced value to a string
-    //if !elem.IsValid() {
-    //	return fmt.Sprintf("%v", elem.Interface())
-    //} else {
-    //	return "<nil-99>"
-    //}
-    //if !val.IsValid() {
-    //	return "<nil-99>"
-    //}
-
-    //if !val.IsValid() {
-    //	return fmt.Sprintf("%v", val.Interface())
-    //} else {
-    //	return "<nil-94>"
-    //}
-  }
-
-  if v == nil {
-    return "<nil-13>"
-  }
-
-  rfx := reflect.ValueOf(v)
-  if rfx.Kind() == reflect.Ptr && rfx.IsNil() {
-    return fmt.Sprintf("<nil> (%v)", reflect.TypeOf(v).String())
-  }
-
-  if kind == reflect.Interface {
-    myVal := reflect.ValueOf(v)
-    myElem := myVal.Elem()
-
-    if !myElem.IsValid() {
-      // Handle zero Value if necessary
-      return "<nil-8888>"
-    }
-
-    myInf := myElem.Interface()
-    return getStringRepresentation(myInf, &myInf, size, brk, depth, cache)
-  }
-
-  if kind == reflect.Chan {
-    return fmt.Sprintf("(chan %s)", val.Type().Elem().String())
-  }
-
-  if kind == reflect.Map {
-    mutex.Lock()
-    if v, ok := (*cache)[vv]; ok {
-      // TODO: verify the caching logic
-      log.Println(aurora.Red("map cached used."))
-      mutex.Unlock()
-      return v
-    }
-    (*cache)[vv] = "(circular)"
-    //fmt.Printf("Map cache: '%v'", len(*cache))
-    mutex.Unlock()
-    (*cache)[vv] = handleMap(v, val, size, brk, depth, cache)
-    return (*cache)[vv]
-  }
-
-  if kind == reflect.Slice {
-
-    mutex.Lock()
-    if v, ok := (*cache)[vv]; ok {
-      // TODO: verify the caching logic
-      log.Println(aurora.Red("slice cached used."))
-      mutex.Unlock()
-      return v
-    }
-    (*cache)[vv] = "(circular)"
-    //fmt.Printf("Slice cache: '%v'", len(*cache))
-    mutex.Unlock()
-
-    var x = ""
-    if m, ok := v.(Stringer); ok {
-      x = m.String()
-      (*cache)[vv] = fmt.Sprintf("%T - (As string: %s)", m, x)
-    } else {
-      (*cache)[vv] = handleSliceAndArray(vv, val, size, brk, depth, cache)
-    }
-
-    //safeStdout.Write([]byte((*cache)[&v]))
-    return (*cache)[vv]
-  }
-
-  if kind == reflect.Array {
-    mutex.Lock()
-    if v, ok := (*cache)[vv]; ok {
-      // TODO: verify the caching logic
-      mutex.Unlock()
-      return v
-    }
-    (*cache)[vv] = "(circular)"
-    //fmt.Printf("Array cache: '%v'", len(*cache))
-    mutex.Unlock()
-
-    var x = ""
-    if m, ok := v.(Stringer); ok {
-      x = m.String()
-      (*cache)[vv] = fmt.Sprintf("(%T (As string: '%s'))", m, x)
-    } else {
-      (*cache)[vv] = handleSliceAndArray(vv, val, size, brk, depth, cache)
-
-    }
-
-    return (*cache)[vv]
-  }
-
-  if kind == reflect.Func {
-    return GetFuncSignature(v)
-  }
-
-  if kind == reflect.Struct {
-    mutex.Lock()
-    if v, ok := (*cache)[vv]; ok {
-      // TODO: verify the caching logic
-      mutex.Unlock()
-      return v
-    }
-    (*cache)[vv] = "(circular)"
-    //fmt.Printf("struct cache: '%v'", len(*cache))
-    mutex.Unlock()
-    (*cache)[vv] = HandleStruct(val, size, brk, depth, cache)
-    return (*cache)[vv]
-  }
-
-  if z, ok := v.(string); ok {
-    if len(z) < 1 {
-      return aurora.Bold("''").String()
-    }
-    var trimmed = strings.TrimSpace(z)
-    if len(trimmed) == len(z) {
-      return aurora.Green(z).String()
-    }
-    return aurora.Bold("'").String() + aurora.Green(z).String() + aurora.Bold("'").String()
-  }
-
-  //if kind == reflect.String {
-  //	//return "'" + aurora.Green(v).String() + "'"
-  //	if len(val) < 1 {
-  //		return aurora.Bold("''").String()
-  //	}
-  //	var trimmed = strings.TrimSpace(z)
-  //	if len(trimmed) == len(z) {
-  //		return aurora.Green(z).String()
-  //	}
-  //	return aurora.Bold("'").String() + aurora.Green(z).String() + aurora.Bold("'").String()
-  //}
 
   if kind == reflect.Bool {
     return aurora.BrightBlue(strconv.FormatBool(v.(bool))).String()
@@ -766,17 +746,17 @@ func getStringRepresentation(v interface{}, vv *interface{}, size int, brk bool,
   if z, err := json.Marshal(v); err == nil {
     //fmt.Println("kind is:", kind.String())
     if originalV != v {
-      return fmt.Sprintf("(go: unknown type 1a: '%+v/%+v/%v/%v', as JSON: '%s', kind: %s)", v, val, originalV, originalVal, z, kind.String())
+      return fmt.Sprintf("(go: unknown type 1a: '%+v/%+v/%v/%v', as JSON: '%s', kind: %s)", v, originalV, originalVal, z, kind.String())
     } else {
-      return fmt.Sprintf("(go: unknown type 2a: '%+v/%+v', as JSON: '%s', kind: %s)", v, val, z, kind.String())
+      return fmt.Sprintf("(go: unknown type 2a: '%+v/%+v', as JSON: '%s', kind: %s)", v, &v, z, kind.String())
     }
 
   }
 
   if originalV != v {
-    return fmt.Sprintf("(go: unknown type 3a: '%+v / %+v / %v / %v')", v, val, originalV, originalVal)
+    return fmt.Sprintf("(go: unknown type 3a: '%+v / %+v / %v / %v')", v, &v, originalV, originalVal)
   } else {
-    return fmt.Sprintf("(go: unknown type 4a: '%+v / %+v')", v, val)
+    return fmt.Sprintf("(go: unknown type 4a: '%+v / %+v')", v, &v)
   }
 
 }
@@ -1164,10 +1144,6 @@ func CleanUp(v *interface{}, cache Cache) (z interface{}) {
   }
 
   if kind == reflect.Bool {
-    return v
-  }
-
-  if kind == reflect.String {
     return v
   }
 

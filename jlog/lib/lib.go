@@ -643,9 +643,9 @@ type EmptyVal struct {
 func doArray(v interface{}, val reflect.Value) *ArrayVal {
 
   var z = ArrayVal{
-    Val:         nil,
     TrueLen:     0,
     IsTruncated: false,
+    Val:         nil,
   }
 
   len := val.Len()
