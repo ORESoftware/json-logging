@@ -632,16 +632,16 @@ type LogItem struct {
 
 type ArrayVal struct {
   GoType      string
-  Val         []interface{}
   TrueLen     int
   IsTruncated bool
+  Val         []interface{}
 }
 
 type MapVal struct {
   GoType       string
-  Val          map[interface{}]interface{}
   TrueKeyCount int
   IsTruncated  bool
+  Val          map[interface{}]interface{}
 }
 
 type EmptyVal struct {
@@ -673,9 +673,9 @@ func doMap(v interface{}, val reflect.Value) *MapVal {
     if i++; i > min {
       break
     }
-    var inf = val.MapIndex(key)
-    if inf.IsValid() && inf.CanInterface() {
-      z.Val[key] = getInspectableVal(inf.Interface(), 0)
+    var el = val.MapIndex(key)
+    if el.IsValid() && el.CanInterface() {
+      z.Val[key] = getInspectableVal(el.Interface(), el, 0)
     } else {
       z.Val[key] = nil
     }
@@ -684,7 +684,7 @@ func doMap(v interface{}, val reflect.Value) *MapVal {
   for i := 0; i < min; i++ {
     el := val.Index(i)
     if el.IsValid() {
-      z.Val[i] = getInspectableVal(el.Interface(), 0)
+      z.Val[i] = getInspectableVal(el.Interface(), el, 0)
     } else {
       // Handle the case where the value is nil
       z.Val[i] = nil // or any default value you want
@@ -700,6 +700,7 @@ func doArray(v interface{}, val reflect.Value) *ArrayVal {
     TrueLen:     0,
     IsTruncated: false,
     Val:         nil,
+    GoType:      "<unknown>",
   }
 
   len := val.Len()
@@ -714,8 +715,11 @@ func doArray(v interface{}, val reflect.Value) *ArrayVal {
 
   for i := 0; i < min; i++ {
     el := val.Index(i)
+    z.GoType = fmt.Sprintf("%v", el.Type())
     if el.IsValid() {
-      z.Val[i] = getInspectableVal(el.Interface(), 0)
+      inf := el.Interface()
+      //z.GoType = fmt.Sprintf("%T", inf)
+      z.Val[i] = getInspectableVal(inf, el, 0)
     } else {
       // Handle the case where the value is nil
       z.Val[i] = nil // or any default value you want
@@ -753,9 +757,9 @@ type UnkVal struct {
   ValAsStr string
 }
 
-func getInspectableVal(obj interface{}, depth int) interface{} {
+func getInspectableVal(obj interface{}, rv reflect.Value, depth int) interface{} {
   ///
-  var rv = reflect.ValueOf(obj)
+  //var rv = reflect.ValueOf(obj)
 
   if !rv.IsValid() {
     // Handle invalid reflection value (e.g., nil pointer)
@@ -868,6 +872,18 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
     return nil
   }
 
+  if x, ok := v.(string); ok {
+    return x
+  }
+
+  if x, ok := v.(int); ok {
+    return x
+  }
+
+  if x, ok := v.(bool); ok {
+    return x
+  }
+
   if depth > 3 {
     return v
   }
@@ -901,6 +917,7 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
 
   if rv.Kind() != reflect.Struct {
     // if it's a not a struct now
+
     var str = fmt.Sprintf("%v", v)
     var t = fmt.Sprintf("%T", v)
     return &UnkVal{
@@ -926,19 +943,19 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
   outResult := make(map[string]interface{})
 
   if typeStr != "" {
-    outResult["@GoType"] = typeStr
+    outResult["@:GoType"] = typeStr
   }
 
   if errStr != "" {
-    outResult["@ErrStr"] = errStr
+    outResult["@:ErrStr"] = errStr
   }
 
   if toString != "" && toString != errStr {
-    outResult["@ToStr"] = toString
+    outResult["@:ToStr"] = toString
   }
 
   innerResult := make(map[string]interface{})
-  outResult["@Val"] = innerResult
+  outResult["@:Val"] = innerResult
 
   typ := rv.Type()
 
@@ -953,12 +970,13 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
     }
 
     if field.Kind() == reflect.Ptr {
-      field = field.Elem()
 
       if field.IsNil() {
         innerResult[fieldName] = nil
         continue
       }
+
+      field = field.Elem()
 
       if !field.IsValid() {
         innerResult[fieldName] = nil
@@ -983,12 +1001,13 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
     }
 
     if field.Kind() == reflect.Ptr {
-      field = field.Elem()
 
       if field.IsNil() {
         innerResult[fieldName] = nil
         continue
       }
+
+      field = field.Elem()
 
       if !field.IsValid() {
         innerResult[fieldName] = nil
@@ -1013,12 +1032,13 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
     }
 
     if field.Kind() == reflect.Ptr {
-      field = field.Elem()
 
       if field.IsNil() {
         innerResult[fieldName] = nil
         continue
       }
+
+      field = field.Elem()
 
       if !field.IsValid() {
         innerResult[fieldName] = nil
@@ -1033,11 +1053,11 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
     }
 
     if field.CanInterface() {
-      innerResult[fieldName] = getInspectableVal(field.Interface(), depth+1)
+      innerResult[fieldName] = getInspectableVal(field.Interface(), field, depth+1)
       continue
     }
 
-    innerResult[fieldName] = fmt.Sprintf("%v (%s)", field, field.String())
+    innerResult[fieldName] = fmt.Sprintf("%v (%s) (Type: %T)", field, field.String(), field.Type())
     continue
   }
 
@@ -1057,13 +1077,14 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
   var hasLogId = false
 
   for _, x := range *args {
+    var xx = reflect.ValueOf(x)
     if z, ok := x.(MetaFields); ok {
       for k, v := range *z.m {
-        m[k] = getInspectableVal(v, 0)
+        m[k] = getInspectableVal(v, xx, 0)
       }
     } else if z, ok := x.(*MetaFields); ok {
       for k, v := range *z.m {
-        m[k] = getInspectableVal(v, 0)
+        m[k] = getInspectableVal(v, xx, 0)
       }
     } else if z, ok := x.(*LogId); ok {
       m["log_id"] = z.Val
@@ -1072,7 +1093,10 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
       m["log_id"] = z.Val
       hasLogId = true
     } else {
-      newArgs = append(newArgs, getInspectableVal(x, 0))
+
+      newArgs = append(newArgs, getInspectableVal(x, xx, 0))
+      //newArgs = append(newArgs, x)
+
     }
   }
 
@@ -1089,7 +1113,9 @@ func (l *Logger) Info(args ...interface{}) {
     return
   }
   t := time.Now()
+  // fmt.Sprintln("000:", args)
   var meta, newArgs = l.getMetaFields(&args)
+  // fmt.Sprintln("111:", newArgs)
   l.writeSwitch(t, ll.INFO, meta, &newArgs)
 }
 
