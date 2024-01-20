@@ -631,13 +631,67 @@ type LogItem struct {
 }
 
 type ArrayVal struct {
+  GoType      string
   Val         []interface{}
   TrueLen     int
   IsTruncated bool
 }
 
+type MapVal struct {
+  GoType       string
+  Val          map[interface{}]interface{}
+  TrueKeyCount int
+  IsTruncated  bool
+}
+
 type EmptyVal struct {
   EmptyVal bool
+}
+
+func doMap(v interface{}, val reflect.Value) *MapVal {
+
+  var z = MapVal{
+    TrueKeyCount: 0,
+    IsTruncated:  false,
+    Val:          nil,
+  }
+
+  len := val.Len()
+  z.TrueKeyCount = len
+
+  keys := val.MapKeys()
+
+  min := int(math.Min(float64(len), float64(25)))
+  if min < len {
+    z.IsTruncated = true
+  }
+
+  z.Val = map[interface{}]interface{}{}
+
+  i := 0
+  for _, key := range keys {
+    if i++; i > min {
+      break
+    }
+    var inf = val.MapIndex(key)
+    if inf.IsValid() && inf.CanInterface() {
+      z.Val[key] = getInspectableVal(inf.Interface(), 0)
+    } else {
+      z.Val[key] = nil
+    }
+  }
+
+  for i := 0; i < min; i++ {
+    el := val.Index(i)
+    if el.IsValid() {
+      z.Val[i] = getInspectableVal(el.Interface(), 0)
+    } else {
+      // Handle the case where the value is nil
+      z.Val[i] = nil // or any default value you want
+    }
+  }
+
+  return &z
 }
 
 func doArray(v interface{}, val reflect.Value) *ArrayVal {
@@ -752,6 +806,36 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
     v = val.Interface()
   }
 
+  if val.Kind() == reflect.Interface {
+
+    if val.IsNil() {
+      // Handle nil interface value
+      return nil
+    }
+
+    if isValBad(&val) {
+      return nil
+    }
+
+    val = val.Elem()
+
+    if isValBad(&val) {
+      return nil
+    }
+
+    v = val.Interface()
+  }
+
+  if val.Kind() == reflect.Ptr {
+    val = val.Elem()
+
+    if isValBad(&val) {
+      return nil
+    }
+
+    v = val.Interface()
+  }
+
   if v == nil {
     return nil
   }
@@ -775,7 +859,12 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
     return doArray(v, val)
   }
 
+  if val.Kind() == reflect.Map {
+    return doArray(v, val)
+  }
+
   if val.Kind() != reflect.Struct {
+    // if it's a Map, it can
     return v
   }
 

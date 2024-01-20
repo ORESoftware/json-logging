@@ -61,7 +61,25 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
       m = val.Interface()
     }
 
+    if val.Kind() == reflect.Interface {
+      val = val.Elem()
+      m = val.Interface()
+    }
+
+    if val.Kind() == reflect.Ptr {
+      val = val.Elem()
+      m = val.Interface()
+    }
+
     z := strings.Builder{}
+
+    if !val.IsValid() {
+      z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
+      z.WriteString(aurora.Bold(" —> ").String())
+      z.WriteString(fmt.Sprintf("%v / %v", m, ptr))
+      z.WriteString(addComma(i, n))
+      continue
+    }
 
     if m == nil {
       z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
@@ -90,7 +108,7 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
     if !val.IsValid() {
       z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
       z.WriteString(aurora.Bold(" —> ").String())
-      z.WriteString(fmt.Sprintf("111 %v %v", m, ptr))
+      z.WriteString(fmt.Sprintf("%v / %v", m, ptr))
       z.WriteString(addComma(i, n))
       continue
     }
@@ -98,13 +116,13 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
     if val.CanInterface() {
       z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
       z.WriteString(aurora.Bold(" —> ").String())
-      z.WriteString(fmt.Sprintf(" 222 %T %+v %+v %v", &ptr, val, m, val.String()))
+      z.WriteString(fmt.Sprintf("%T %+v %+v %v", ptr, val, m, val.String()))
       //z.WriteString(fmt.Sprintf(" 222 %v -- %v -- %v", m, val.String(), val.Interface()))
       z.WriteString(addComma(i, n))
     } else {
       z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
       z.WriteString(aurora.Bold(" —> ").String())
-      z.WriteString(fmt.Sprintf(" 333 %v (%v)", m, m))
+      z.WriteString(fmt.Sprintf("%v / (%v)", m, m))
       z.WriteString(addComma(i, n))
     }
 
@@ -437,40 +455,36 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
     return getHighlightedString(*z)
   }
 
-  rv := reflect.ValueOf(v)
+  var rv = reflect.ValueOf(v)
+  var kind = rv.Kind()
 
-  if rv.Kind() == reflect.Ptr && rv.IsNil() {
+  if kind == reflect.Ptr && rv.IsNil() {
     return fmt.Sprintf("<nil> (%v)", rv.Type())
+  }
+
+  if !rv.IsValid() {
+    return "<nil>"
   }
 
   originalV := v
   originalVal := rv
 
-  var kind = rv.Kind()
-
   if kind == reflect.Uintptr || kind == reflect.UnsafePointer || kind == reflect.Ptr {
-    //v = val.Elem().Interface()
-    //val = reflect.ValueOf(v)
-
-    if rv.IsNil() {
-      return "<nil>"
-    }
 
     rv = rv.Elem()
 
-    if rv.IsValid() {
-      // Check if the dereferenced value is valid
-      v = rv.Interface()
-
-      if v == nil {
-        return "<nil>"
-      }
-
-      kind = rv.Kind()
-
-    } else {
+    if !rv.IsValid() {
       return "<nil>"
     }
+
+    // Check if the dereferenced value is valid
+    v = rv.Interface()
+
+    if v == nil {
+      return "<nil>"
+    }
+
+    kind = rv.Kind()
   }
 
   if kind == reflect.Ptr {
