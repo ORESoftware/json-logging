@@ -735,135 +735,161 @@ func doArray(v interface{}, val reflect.Value) *ArrayVal {
   return &z
 }
 
-func isValBad(val *reflect.Value) bool {
+type VibeInspectStr interface {
+  ToString() string
+}
 
-  if val == nil {
-    return true
-  }
+type VibeInspectInt interface {
+  ToInt() int
+}
 
-  if !val.IsValid() {
-    // Handle invalid reflection value (e.g., nil pointer)
-    return true
-  }
-
-  return false
+type VibeInspectBool interface {
+  ToBool() bool
 }
 
 func getInspectableVal(obj interface{}, depth int) interface{} {
   ///
-  val := reflect.ValueOf(obj)
+  var rv = reflect.ValueOf(obj)
 
-  if !val.IsValid() {
+  if !rv.IsValid() {
     // Handle invalid reflection value (e.g., nil pointer)
     return nil
   }
 
-  v := val.Interface()
+  var v = rv.Interface()
 
-  if val.Kind() == reflect.Ptr {
+  if rv.Kind() == reflect.Ptr {
 
-    if val.IsNil() {
+    if rv.IsNil() {
       // Handle nil interface value
       return nil
     }
 
-    val = val.Elem()
+    rv = rv.Elem()
 
-    if isValBad(&val) {
+    if !rv.IsValid() {
       return nil
     }
 
-    v = val.Interface()
+    v = rv.Interface()
   }
 
-  if val.Kind() == reflect.Interface {
+  if rv.Kind() == reflect.Interface {
 
-    if val.IsNil() {
+    if rv.IsNil() {
       // Handle nil interface value
       return nil
     }
 
-    if isValBad(&val) {
+    if !rv.IsValid() {
       return nil
     }
 
-    val = val.Elem()
+    rv = rv.Elem()
 
-    if isValBad(&val) {
+    if !rv.IsValid() {
       return nil
     }
 
-    v = val.Interface()
+    v = rv.Interface()
   }
 
-  if val.Kind() == reflect.Ptr {
-    val = val.Elem()
+  if rv.Kind() == reflect.Ptr {
 
-    if isValBad(&val) {
-      return nil
-    }
-
-    v = val.Interface()
-  }
-
-  if val.Kind() == reflect.Interface {
-
-    if val.IsNil() {
+    if rv.IsNil() {
       // Handle nil interface value
       return nil
     }
 
-    if isValBad(&val) {
+    if !rv.IsValid() {
       return nil
     }
 
-    val = val.Elem()
+    rv = rv.Elem()
 
-    if isValBad(&val) {
+    if !rv.IsValid() {
       return nil
     }
 
-    v = val.Interface()
+    v = rv.Interface()
   }
 
-  if val.Kind() == reflect.Ptr {
-    val = val.Elem()
+  if rv.Kind() == reflect.Interface {
 
-    if isValBad(&val) {
+    if rv.IsNil() {
+      // Handle nil interface value
       return nil
     }
 
-    v = val.Interface()
+    if !rv.IsValid() {
+      return nil
+    }
+
+    rv = rv.Elem()
+
+    if !rv.IsValid() {
+      return nil
+    }
+
+    v = rv.Interface()
+  }
+
+  if rv.Kind() == reflect.Ptr {
+
+    if rv.IsNil() {
+      // Handle nil interface value
+      return nil
+    }
+
+    if !rv.IsValid() {
+      return nil
+    }
+
+    rv = rv.Elem()
+
+    if !rv.IsValid() {
+      return nil
+    }
+
+    v = rv.Interface()
   }
 
   if v == nil {
     return nil
   }
 
-  switch val.Kind() {
+  if depth > 3 {
+    return v
+  }
+
+  if !rv.IsValid() {
+    return nil
+  }
+
+  switch rv.Kind() {
   case reflect.Slice:
-    if val.Type().Elem().Kind() == reflect.Uint8 {
+    if rv.Type().Elem().Kind() == reflect.Uint8 {
       if z, ok := v.([]byte); ok {
         return string(z)
       }
       //return v
     }
-    return doArray(v, val)
+    return doArray(v, rv)
   case reflect.Array:
-    if val.Type().Elem().Kind() == reflect.Uint8 {
+    if rv.Type().Elem().Kind() == reflect.Uint8 {
       if z, ok := v.([]byte); ok {
         return string(z)
       }
       //return v
     }
-    return doArray(v, val)
+    return doArray(v, rv)
   }
 
-  if val.Kind() == reflect.Map {
-    return doArray(v, val)
+  if rv.Kind() == reflect.Map {
+    return doMap(v, rv)
   }
 
-  if val.Kind() != reflect.Struct {
+  if rv.Kind() != reflect.Struct {
     // if it's a Map, it can
     return v
   }
@@ -889,11 +915,11 @@ func getInspectableVal(obj interface{}, depth int) interface{} {
     result["@ToStr"] = toString
   }
 
-  typ := val.Type()
+  typ := rv.Type()
 
-  for i := 0; i < val.NumField(); i++ {
+  for i := 0; i < rv.NumField(); i++ {
 
-    field := val.Field(i)
+    field := rv.Field(i)
     fieldName := typ.Field(i).Name
 
     if field.Kind() == reflect.Ptr {
