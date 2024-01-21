@@ -196,10 +196,10 @@ func (x *LogId) GetLogId(isHyperLink bool) string {
   // fmt.Println("\\e]8;;http://example.com\aThis is the link\\e]8;;\\e\\")
   // fmt.Println(fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", "https://linkedin.com", "Go to Linked"))
 
-  fmt.Println(fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", "Go to Linked", "https://linkedin.com"))
+  // fmt.Println(fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", "Go to x", "Go to XX"))
 
   if isHyperLink {
-    return au.Col.Blue("(Goto -> LogId)").Hyperlink(fmt.Sprintf("http://vibeirl.com/dev/links?%s", x.Val)).String()
+    return au.Col.Blue("(Goto -> LogId)").Hyperlink(fmt.Sprintf("http://vibeirl.com/dev/links?%s", x.Val)).HyperlinkTarget()
   } else {
     return fmt.Sprintf("(log-id:'%s')", x.Val)
   }
@@ -1154,7 +1154,6 @@ func (l *Logger) Info(args ...interface{}) {
   }
   t := time.Now()
   var meta, newArgs = l.getMetaFields(&args)
-  fmt.Println("new args:", newArgs)
   l.writeSwitch(t, ll.INFO, meta, &newArgs)
 }
 
