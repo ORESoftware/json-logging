@@ -5,7 +5,7 @@ import (
   "errors"
   "fmt"
   uuid "github.com/google/uuid"
-  "github.com/logrusorgru/aurora"
+  au "github.com/oresoftware/json-logging/jlog/au"
   hlpr "github.com/oresoftware/json-logging/jlog/helper"
   ll "github.com/oresoftware/json-logging/jlog/level"
   "github.com/oresoftware/json-logging/jlog/shared"
@@ -480,34 +480,34 @@ func (l *MultiLogger) getPrettyString(level ll.LogLevel, m *MetaFields, args *[]
   switch level {
 
   case ll.ERROR:
-    stylizedLevel = aurora.Underline(aurora.Bold(aurora.Red("ERROR"))).String()
+    stylizedLevel = au.Col.Underline(au.Col.Bold(au.Col.Red("ERROR"))).String()
     break
 
   case ll.WARN:
-    stylizedLevel = aurora.Magenta("WARN").String()
+    stylizedLevel = au.Col.Magenta("WARN").String()
     break
 
   case ll.DEBUG:
-    stylizedLevel = aurora.Bold("DEBUG").String()
+    stylizedLevel = au.Col.Bold("DEBUG").String()
     break
 
   case ll.INFO:
-    stylizedLevel = aurora.Gray(12, "INFO").String()
+    stylizedLevel = au.Col.Gray(12, "INFO").String()
     break
 
   case ll.TRACE:
-    stylizedLevel = aurora.Gray(4, "TRACE").String()
+    stylizedLevel = au.Col.Gray(4, "TRACE").String()
     break
   }
 
   var b strings.Builder
 
-  b.WriteString(aurora.Gray(9, date).String())
+  b.WriteString(au.Col.Gray(9, date).String())
   b.WriteString(" ")
   b.WriteString(stylizedLevel)
   b.WriteString(" ")
-  b.WriteString(aurora.Gray(12, "app:").String())
-  b.WriteString(aurora.Italic(l.AppName).String())
+  b.WriteString(au.Col.Gray(12, "app:").String())
+  b.WriteString(au.Col.Italic(l.AppName).String())
   b.WriteString(" ")
 
   size := 0
@@ -519,7 +519,7 @@ func (l *MultiLogger) getPrettyString(level ll.LogLevel, m *MetaFields, args *[]
     val := reflect.ValueOf(v)
     var kind = reflect.TypeOf(v).Kind()
 
-    if kind == reflect.Ptr {
+    if kind == reflect.Ptr || kind == reflect.Interface {
       //v = val.Elem().Interface()
       //val = reflect.ValueOf(v)
       val = val.Elem()

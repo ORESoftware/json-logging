@@ -3,7 +3,6 @@ package hlpr
 import (
   "encoding/json"
   "fmt"
-  "github.com/logrusorgru/aurora"
   "log"
   "os"
   "path/filepath"
@@ -14,6 +13,7 @@ import (
   "strings"
   "sync"
   "unsafe"
+  . "github.com/logrusorgru/aurora/v4"
 )
 
 func addComma(i int, n int) string {
@@ -35,7 +35,7 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
   n := len(keys)
 
   if n < 1 {
-    return fmt.Sprintf(aurora.Black("(empty map - %T)").String(), x)
+    return fmt.Sprintf(Black("(empty map - %T)").String(), x)
   }
 
   values := []string{}
@@ -60,8 +60,8 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
       }
       val = val.Elem()
       if !val.IsValid() {
-        z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
-        z.WriteString(aurora.Bold(" —> ").String())
+        z.WriteString(fmt.Sprintf("'%s'", Cyan(fmt.Sprintf("%s", k.Interface())).String()))
+        z.WriteString(Bold(" —> ").String())
         z.WriteString(fmt.Sprintf("%v / %v", m, ptr))
         z.WriteString(addComma(i, n))
         break
@@ -70,16 +70,16 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
     }
 
     if !val.IsValid() {
-      z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
-      z.WriteString(aurora.Bold(" —> ").String())
+      z.WriteString(fmt.Sprintf("'%s'", Cyan(fmt.Sprintf("%s", k.Interface())).String()))
+      z.WriteString(Bold(" —> ").String())
       z.WriteString(fmt.Sprintf("%v / %v", m, ptr))
       z.WriteString(addComma(i, n))
       continue
     }
 
     if m == nil {
-      z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
-      z.WriteString(aurora.Bold(" —> ").String())
+      z.WriteString(fmt.Sprintf("'%s'", Cyan(fmt.Sprintf("%s", k.Interface())).String()))
+      z.WriteString(Bold(" —> ").String())
       z.WriteString(fmt.Sprintf(" 000 %v (%T)", m, m))
       z.WriteString(addComma(i, n))
       continue
@@ -102,22 +102,22 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
     }
 
     if !val.IsValid() {
-      z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
-      z.WriteString(aurora.Bold(" —> ").String())
+      z.WriteString(fmt.Sprintf("'%s'", Cyan(fmt.Sprintf("%s", k.Interface())).String()))
+      z.WriteString(Bold(" —> ").String())
       z.WriteString(fmt.Sprintf("%v / %v", m, ptr))
       z.WriteString(addComma(i, n))
       continue
     }
 
     if val.CanInterface() {
-      z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
-      z.WriteString(aurora.Bold(" —> ").String())
+      z.WriteString(fmt.Sprintf("'%s'", Cyan(fmt.Sprintf("%s", k.Interface())).String()))
+      z.WriteString(Bold(" —> ").String())
       z.WriteString(fmt.Sprintf("%T %+v %+v %v", ptr, val, m, val.String()))
       //z.WriteString(fmt.Sprintf(" 222 %v -- %v -- %v", rv, val.String(), val.Interface()))
       z.WriteString(addComma(i, n))
     } else {
-      z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
-      z.WriteString(aurora.Bold(" —> ").String())
+      z.WriteString(fmt.Sprintf("'%s'", Cyan(fmt.Sprintf("%s", k.Interface())).String()))
+      z.WriteString(Bold(" —> ").String())
       z.WriteString(fmt.Sprintf("%v / (%v)", m, m))
       z.WriteString(addComma(i, n))
     }
@@ -141,14 +141,14 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
 
   var b strings.Builder
 
-  b.WriteString(aurora.Bold(fmt.Sprintf("%T (", x)).String() + createNewline(brk, true))
+  b.WriteString(Bold(fmt.Sprintf("%T (", x)).String() + createNewline(brk, true))
 
   for i := 0; i < n; i++ {
     b.WriteString(createSpaces(depth, brk) + values[i] + createNewline(brk, true))
   }
 
   b.WriteString(createSpaces(depth-1, brk))
-  b.WriteString(aurora.Bold(")").String() + createNewline(brk, false))
+  b.WriteString(Bold(")").String() + createNewline(brk, false))
   return b.String()
 }
 
@@ -164,17 +164,17 @@ func handleSliceAndArray(v interface{}, len int, brk bool, depth int, cache *map
   t := rv.Type()
 
   if n < 1 {
-    return aurora.Black("[").String() + "" + aurora.Black(fmt.Sprintf("] (empty %v)", t)).String()
+    return Black("[").String() + "" + Black(fmt.Sprintf("] (empty %v)", t)).String()
   }
 
   elementType := t.Elem()
 
   if elementType.Kind() == reflect.Uint8 {
-    return aurora.Bold("[]byte as str:").String() + fmt.Sprintf(" '%s'", v)
+    return Bold("[]byte as str:").String() + fmt.Sprintf(" '%s'", v)
   }
 
   var b strings.Builder
-  b.WriteString(createSpaces(depth, brk) + aurora.Bold("[").String())
+  b.WriteString(createSpaces(depth, brk) + Bold("[").String())
 
   for i := 0; i < n; i++ {
     b.WriteString(createSpaces(depth, brk))
@@ -196,7 +196,7 @@ func handleSliceAndArray(v interface{}, len int, brk bool, depth int, cache *map
     b.WriteString(addComma(i, n))
   }
 
-  b.WriteString(createNewline(brk, true) + aurora.Bold("]").String())
+  b.WriteString(createNewline(brk, true) + Bold("]").String())
   return b.String()
 }
 
@@ -287,7 +287,7 @@ func handleStruct(obj interface{}, size int, brk bool, depth int, cache *map[*in
   b.WriteString(" {" + createNewline(brk, n > 0))
 
   for i := 0; i < n; i++ {
-    var k = aurora.Bold(aurora.Blue(keys[i])).String()
+    var k = Bold(Blue(keys[i])).String()
     b.WriteString(createSpaces(depth, brk) + k)
     b.WriteString(" ")
     b.WriteString(values[i])
@@ -396,18 +396,18 @@ func GetFuncSignature(v interface{}) string {
 var mutex sync.Mutex
 
 func getFormattedNilStr(str string) string {
-  return aurora.Black(aurora.Bold("<nil>")).String()
+  return Black(Bold("<nil>")).String()
 }
 
 func getHighlightedString(val string) string {
   if len(val) < 1 {
-    return aurora.Bold("''").String()
+    return Bold("''").String()
   }
   var trimmed = strings.TrimSpace(val)
   if len(trimmed) == len(val) {
-    return aurora.Green(val).String()
+    return Green(val).String()
   }
-  return aurora.Bold("'").String() + aurora.Green(val).String() + aurora.Bold("'").String()
+  return Bold("'").String() + Green(val).String() + Bold("'").String()
 }
 
 func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) (s string) {
@@ -518,91 +518,91 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
   }
 
   if kind == reflect.Bool {
-    return aurora.BrightBlue(strconv.FormatBool(v.(bool))).String()
+    return BrightBlue(strconv.FormatBool(v.(bool))).String()
   }
 
   if _, ok := v.(bool); ok {
-    return aurora.BrightBlue(strconv.FormatBool(v.(bool))).String()
+    return BrightBlue(strconv.FormatBool(v.(bool))).String()
   }
 
   if kind == reflect.Int {
-    return aurora.Yellow(v).String()
+    return Yellow(v).String()
   }
 
   if _, ok := v.(int); ok {
-    return aurora.Yellow(strconv.Itoa(v.(int))).String()
+    return Yellow(strconv.Itoa(v.(int))).String()
   }
 
   if kind == reflect.Int8 {
-    return aurora.Yellow(v).String()
+    return Yellow(v).String()
   }
 
   if _, ok := v.(int8); ok {
-    return aurora.Yellow(v.(int8)).String()
+    return Yellow(v.(int8)).String()
   }
 
   if kind == reflect.Int16 {
-    return aurora.Yellow(v).String()
+    return Yellow(v).String()
   }
 
   if _, ok := v.(int16); ok {
-    return aurora.Yellow(v.(int16)).String()
+    return Yellow(v.(int16)).String()
   }
 
   if kind == reflect.Int32 {
-    return aurora.Yellow(v).String()
+    return Yellow(v).String()
   }
 
   if _, ok := v.(int32); ok {
-    return aurora.Yellow(v.(int32)).String()
+    return Yellow(v.(int32)).String()
   }
 
   if kind == reflect.Int64 {
-    return aurora.Yellow(v).String()
+    return Yellow(v).String()
   }
 
   if _, ok := v.(int64); ok {
-    return aurora.Yellow(strconv.FormatInt(v.(int64), 1)).String()
+    return Yellow(strconv.FormatInt(v.(int64), 1)).String()
   }
 
   if kind == reflect.Uint {
-    return aurora.Yellow(v).String()
+    return Yellow(v).String()
   }
 
   if _, ok := v.(uint); ok {
-    return aurora.Yellow(v.(uint)).String()
+    return Yellow(v.(uint)).String()
   }
 
   if kind == reflect.Uint8 {
-    return aurora.Yellow(v).String()
+    return Yellow(v).String()
   }
 
   if _, ok := v.(uint8); ok {
-    return aurora.Yellow(v).String()
+    return Yellow(v).String()
   }
 
   if kind == reflect.Uint16 {
-    return aurora.Yellow(v).String()
+    return Yellow(v).String()
   }
 
   if _, ok := v.(uint16); ok {
-    return aurora.Yellow(v.(uint16)).String()
+    return Yellow(v.(uint16)).String()
   }
 
   if kind == reflect.Uint32 {
-    return aurora.Yellow(v).String()
+    return Yellow(v).String()
   }
 
   if _, ok := v.(uint32); ok {
-    return aurora.Yellow(v.(uint32)).String()
+    return Yellow(v.(uint32)).String()
   }
 
   if kind == reflect.Uint64 {
-    return aurora.Yellow(v).String()
+    return Yellow(v).String()
   }
 
   if _, ok := v.(uint64); ok {
-    return aurora.Yellow(v.(uint64)).String()
+    return Yellow(v.(uint64)).String()
   }
 
   if z, ok := v.(Stringer); ok && z != nil && &z != nil && v != nil {
