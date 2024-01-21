@@ -761,15 +761,15 @@ func doMap(v interface{}, val reflect.Value) *MapVal {
     }
   }
 
-  for i := 0; i < min; i++ {
-    el := val.Index(i)
-    if el.IsValid() {
-      z.Val[i] = getInspectableVal(el.Interface(), el, 0, 1)
-    } else {
-      // Handle the case where the value is nil
-      z.Val[i] = nil // or any default value you want
-    }
-  }
+  //for i := 0; i < min; i++ {
+  //  el := val.Index(i)
+  //  if el.IsValid() {
+  //    z.Val[i] = getInspectableVal(el.Interface(), el, 0, 1)
+  //  } else {
+  //    // Handle the case where the value is nil
+  //    z.Val[i] = nil // or any default value you want
+  //  }
+  //}
 
   return &z
 }
