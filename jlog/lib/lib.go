@@ -986,19 +986,19 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
   outResult := make(map[string]interface{})
 
   if typeStr != "" {
-    outResult["@:GoType"] = typeStr
+    outResult["+(GoType):"] = typeStr
   }
 
   if errStr != "" {
-    outResult["@:ErrStr"] = errStr
+    outResult["+(ErrStr):"] = errStr
   }
 
   if toString != "" && toString != errStr {
-    outResult["@:ToStr"] = toString
+    outResult["+(ToStr):"] = toString
   }
 
   innerResult := make(map[string]interface{})
-  outResult["@:Val"] = innerResult
+  outResult["+(Val):"] = innerResult
 
   typ := rv.Type()
 
@@ -1115,7 +1115,7 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
     }
   }
 
-  if !hasLogId {
+  if false && !hasLogId {
     fmt.Println("missing log id:", string(debug.Stack()))
   }
 

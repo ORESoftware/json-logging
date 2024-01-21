@@ -691,7 +691,6 @@ func CopyAndDereference(s interface{}) interface{} {
     n := val.Len()
     slice := make([]interface{}, n)
     for i := 0; i < n; i++ {
-      // Recursively copy and dereference each element in the slice or array
       rv := val.Index(i)
       if rv.IsValid() && rv.CanInterface() {
         slice[i] = CopyAndDereference(val.Index(i).Interface())
@@ -772,7 +771,7 @@ func cleanStructWorks(val reflect.Value, cache Cache) interface{} {
         // Recursively copy the value and get a reflect.Value
         elem := fieldVal.Elem()
 
-        if elem.CanInterface() {
+        if elem.IsValid() && elem.CanInterface() {
 
           xyz := elem.Interface()
           copiedVal := reflect.ValueOf(CleanUp(&xyz, cache))
