@@ -28,7 +28,7 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
   var rv = reflect.ValueOf(x)
 
   if !rv.IsValid() {
-    return fmt.Sprintf("<nil> (Type: %T)", x)
+    return fmt.Sprintf("<nil-00009> (Type: %T)", x)
   }
 
   keys := rv.MapKeys()
@@ -46,47 +46,28 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
     m := val.Interface()
     var ptr uintptr
 
-    if val.Kind() == reflect.Ptr {
-      if val.IsNil() {
-        return fmt.Sprintf("<nil> (%T)", m)
-      }
-      val = val.Elem()
-      m = val.Interface()
-    }
-
-    if val.Kind() == reflect.Interface {
-      if val.IsNil() {
-        return fmt.Sprintf("<nil> (%T)", m)
-      }
-      val = val.Elem()
-      m = val.Interface()
-    }
-
-    if val.Kind() == reflect.Ptr {
-      if val.IsNil() {
-        return fmt.Sprintf("<nil> (%T)", m)
-      }
-      val = val.Elem()
-      m = val.Interface()
-    }
-
-    if val.Kind() == reflect.Interface {
-      if val.IsNil() {
-        return fmt.Sprintf("<nil> (%T)", m)
-      }
-      val = val.Elem()
-      m = val.Interface()
-    }
-
-    if val.Kind() == reflect.Ptr {
-      if val.IsNil() {
-        return fmt.Sprintf("<nil> (%T)", m)
-      }
-      val = val.Elem()
-      m = val.Interface()
-    }
-
     z := strings.Builder{}
+
+    var count = 0
+    for count++; i < 9; {
+      if !(val.Kind() == reflect.Ptr || val.Kind() == reflect.Interface) {
+        break
+      }
+
+      if val.IsNil() {
+        z.WriteString(fmt.Sprintf("<nil 0000010> (%T)", m))
+        break
+      }
+      val = val.Elem()
+      if !val.IsValid() {
+        z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
+        z.WriteString(aurora.Bold(" —> ").String())
+        z.WriteString(fmt.Sprintf("%v / %v", m, ptr))
+        z.WriteString(addComma(i, n))
+        break
+      }
+      m = val.Interface()
+    }
 
     if !val.IsValid() {
       z.WriteString(fmt.Sprintf("'%s'", aurora.Cyan(fmt.Sprintf("%s", k.Interface())).String()))
@@ -176,7 +157,7 @@ func handleSliceAndArray(v interface{}, len int, brk bool, depth int, cache *map
   rv := reflect.ValueOf(v)
 
   if !rv.IsValid() {
-    return "<nil>"
+    return "<nil - 6667>"
   }
 
   n := rv.Len()
@@ -243,8 +224,8 @@ func handleStruct(obj interface{}, size int, brk bool, depth int, cache *map[*in
 
   rv := reflect.ValueOf(obj)
 
-  if rv.IsValid() {
-    return "<nil>"
+  if !rv.IsValid() {
+    return "<nil - 6669>"
   }
 
   n := rv.NumField()
@@ -450,58 +431,22 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
   }
 
   if v == nil {
-    return "<nil>"
-  }
-
-  if z, ok := v.(aurora.Value); ok && z != nil {
-    return getHighlightedString(z.String())
-  }
-
-  if z, ok := v.(*aurora.Value); ok && z != nil {
-    return getHighlightedString((*z).String())
-  }
-
-  if z, ok := v.(string); ok {
-    return getHighlightedString(z)
-  }
-
-  if z, ok := v.(*string); ok && z != nil {
-    return getHighlightedString(*z)
+    return "<nil-8>"
   }
 
   var rv = reflect.ValueOf(v)
-  var kind = rv.Kind()
-
-  if kind == reflect.Ptr && rv.IsNil() {
-    return fmt.Sprintf("<nil> (%v)", rv.Type())
-  }
 
   if !rv.IsValid() {
-    return "<nil>"
+    return "<nil 119>"
   }
 
-  originalV := v
-  originalVal := rv
+  var kind = rv.Kind()
 
-  if kind == reflect.Uintptr || kind == reflect.UnsafePointer || kind == reflect.Ptr {
+  for {
 
-    rv = rv.Elem()
-
-    if !rv.IsValid() {
-      return "<nil>"
+    if !(kind == reflect.Ptr || kind == reflect.Interface) {
+      break
     }
-
-    // Check if the dereferenced value is valid
-    v = rv.Interface()
-
-    if v == nil {
-      return "<nil>"
-    }
-
-    kind = rv.Kind()
-  }
-
-  if kind == reflect.Ptr {
 
     if rv.IsNil() {
       return "<nil>"
@@ -510,121 +455,25 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
     rv = rv.Elem()
 
     if !rv.IsValid() { // Check if the dereferenced value is valid
-      return "<nil>"
+      return "<nil 114>"
     }
 
     v = rv.Interface()
 
     if v == nil {
-      return "<nil>"
+      return "<nil 115>"
     }
 
     kind = rv.Kind()
-  }
 
-  if kind == reflect.Interface {
-
-    if rv.IsNil() {
-      return "<nil>"
-    }
-
-    rv = rv.Elem()
-
-    if !rv.IsValid() {
-      // Handle zero Value if necessary
-      return "<nil>"
-    }
-
-    v = rv.Interface()
-    kind = rv.Kind()
-  }
-
-  if kind == reflect.Ptr {
-    // Dereference the pointer
-
-    if rv.IsNil() {
-      return "<nil>"
-    }
-
-    rv = rv.Elem()
-
-    if !rv.IsValid() {
-      // Handle zero Value if necessary
-      return "<nil>"
-    }
-
-    kind = rv.Kind()
-    v = rv.Interface()
   }
 
   if v == nil {
     return "<nil>"
   }
 
-  if rv.Kind() == reflect.Ptr {
-
-    if rv.IsNil() {
-      return "<nil>"
-    }
-
-    rv = rv.Elem()
-
-    if !rv.IsValid() {
-      // Handle zero Value if necessary
-      return "<nil>"
-    }
-
-    kind = rv.Kind()
-    v = rv.Interface()
-  }
-
-  if rv.Kind() == reflect.Ptr {
-
-    rv = rv.Elem()
-
-    if !rv.IsValid() {
-      // Handle zero Value if necessary
-      return "<nil>"
-    }
-
-    kind = rv.Kind()
-    v = rv.Interface()
-
-    return fmt.Sprintf("<nil> (%v)", reflect.TypeOf(v).String())
-  }
-
-  if kind == reflect.Interface {
-
-    rv = rv.Elem()
-
-    if !rv.IsValid() {
-      // Handle zero Value if necessary
-      return "<nil>"
-    }
-
-    myInf := rv.Interface()
-    return getStringRepresentation(myInf, size, brk, depth, cache)
-  }
-
-  if rv.Kind() == reflect.Ptr {
-
-    if rv.IsNil() {
-      return "<nil>"
-    }
-
-    rv = rv.Elem()
-
-    if !rv.IsValid() {
-      // Handle zero Value if necessary
-      return "<nil>"
-    }
-
-    kind = rv.Kind()
-    v = rv.Interface()
-  }
-
-  if rv.Kind() == reflect.Ptr {
-    return fmt.Sprintf("pointer <- pointer (%v)", rv.Type())
+  if rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Ptr {
+    return fmt.Sprintf("pointer /interface -> (%v)", rv.Type())
   }
 
   if z, ok := v.(string); ok {
@@ -775,19 +624,23 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 
   if z, err := json.Marshal(v); err == nil {
     //fmt.Println("kind is:", kind.String())
-    if originalV != v {
-      return fmt.Sprintf("(go: unknown type 1a: '%+v/%+v/%v/%v', as JSON: '%s', kind: %s)", v, originalV, originalVal, z, kind.String())
-    } else {
-      return fmt.Sprintf("(go: unknown type 2a: '%+v/%+v', as JSON: '%s', kind: %s)", v, &v, z, kind.String())
-    }
+    // if false && originalV != v {
+    //   return fmt.Sprintf("(go: unknown type 1a: '%+v/%+v/%v/%v', as JSON: '%s', kind: %s)", v, originalV, originalVal, z, kind.String())
+    // } else {
+    //   return fmt.Sprintf("(go: unknown type 2a: '%+v/%+v', as JSON: '%s', kind: %s)", v, &v, z, kind.String())
+    // }
+
+    return fmt.Sprintf("(go: unknown type 2a: '%+v/%+v', as JSON: '%s', kind: %s)", v, &v, z, kind.String())
 
   }
 
-  if originalV != v {
-    return fmt.Sprintf("(go: unknown type 3a: '%+v / %+v / %v / %v')", v, &v, originalV, originalVal)
-  } else {
-    return fmt.Sprintf("(go: unknown type 4a: '%+v / %+v')", v, &v)
-  }
+  // if false && originalV != v {
+  //   return fmt.Sprintf("(go: unknown type 3a: '%+v / %+v / %v / %v')", v, &v, originalV, originalVal)
+  // } else {
+  //   return fmt.Sprintf("(go: unknown type 4a: '%+v / %+v')", v, &v)
+  // }
+
+  return fmt.Sprintf("(go: unknown type 4a: '%+v / %+v')", v, &v)
 
 }
 

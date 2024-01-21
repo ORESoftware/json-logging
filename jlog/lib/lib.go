@@ -161,9 +161,9 @@ func CreateLogger(AppName string) *Logger {
   })
 }
 
-//func NewLogger(AppName string, forceJSON bool, hostName string, envTokenPrefix string) *Logger {
+// func NewLogger(AppName string, forceJSON bool, hostName string, envTokenPrefix string) *Logger {
 //	return New(AppName, forceJSON, hostName, envTokenPrefix)
-//}
+// }
 
 type KV struct {
   Key   string
@@ -192,7 +192,7 @@ type LogId struct {
 }
 
 func (x *LogId) GetLogId() string {
-  return x.Val
+  return fmt.Sprintf("(log-id: '%s')", x.Val)
 }
 
 func (x *LogId) IsLogId() bool {
@@ -427,28 +427,65 @@ func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaField
     var primitive = true
 
     if v == nil {
-      b.WriteString(fmt.Sprintf("<nil> - (%T)", v))
+      b.WriteString(fmt.Sprintf("<nil 1> - (%T)", v))
       continue
     }
 
     if &v == nil {
-      b.WriteString(fmt.Sprintf("<nil> (%T)", v))
+      b.WriteString(fmt.Sprintf("<nil 2> (%T)", v))
       continue
     }
 
-    val := reflect.ValueOf(v)
+    var rv = reflect.ValueOf(v)
     var t = reflect.TypeOf(v)
     var kind = t.Kind()
 
-    if kind == reflect.Ptr {
-      //v = Val.Elem().Interface()
-      //Val = reflect.ValueOf(v)
-      val = val.Elem()
-      if val.IsValid() { // Check if the dereferenced value is valid
-        v = val.Interface()
-        val = reflect.ValueOf(v)
-        kind = val.Kind()
+    if !rv.IsValid() {
+      b.WriteString(fmt.Sprintf("%v", v))
+      continue
+    }
+
+    var counter = 0
+
+    for {
+
+      if !(kind == reflect.Ptr && kind == reflect.Interface) {
+        break
       }
+
+      if !rv.IsNil() {
+        b.WriteString(fmt.Sprintf("%v", v))
+        break
+      }
+
+      if !rv.IsValid() { // Check if the dereferenced value is valid
+        v = nil
+        break
+      }
+
+      rv = rv.Elem()
+
+      if !rv.IsValid() { // Check if the dereferenced value is valid
+        v = nil
+        break
+      }
+
+      t = rv.Type()
+      kind = rv.Kind()
+      v = rv.Interface()
+      if counter++; counter > 6 {
+        break
+      }
+
+    }
+
+    if !rv.IsValid() {
+      b.WriteString(fmt.Sprintf("(%v)) - (%T)", v, v))
+    }
+
+    if kind == reflect.Ptr || kind == reflect.Interface {
+      b.WriteString(fmt.Sprintf("(%v) - (%T)", v, v))
+      continue
     }
 
     if shared.IsNonPrimitive(kind) {
@@ -517,12 +554,12 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
     mf = NewMetaFields(&MF{})
   }
 
-  //shared.StdioPool.Run(func(g *sync.WaitGroup) {
+  // shared.StdioPool.Run(func(g *sync.WaitGroup) {
 
   var wg = sync.WaitGroup{}
   wg.Add(1)
 
-  //shared.StdioPool.Run(func(g *sync.WaitGroup) {
+  // shared.StdioPool.Run(func(g *sync.WaitGroup) {
 
   go func() {
 
@@ -536,7 +573,7 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
       _, file, line, _ := runtime.Caller(3)
       DefaultLogger.Warn("could not marshal the slice:", err.Error(), "file://"+file+":"+strconv.Itoa(line))
 
-      //cleaned := make([]interface{},0)
+      // cleaned := make([]interface{},0)
 
       var cache = map[*interface{}]*interface{}{}
       var cleaned = make([]interface{}, 0)
@@ -545,7 +582,7 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
         // TODO: for now instead of cleanUp, we can ust fmt.Sprintf()
         v := &(*args)[i]
         c := hlpr.CleanUp(v, &cache)
-        //debug.PrintStack()
+        // debug.PrintStack()
         cleaned = append(cleaned, c)
       }
 
@@ -755,7 +792,7 @@ func doArray(v interface{}, rv reflect.Value) *ArrayVal {
     if el.IsValid() {
       z.GoType = fmt.Sprintf("%s", el.Type().String())
       inf := el.Interface()
-      //z.GoType = fmt.Sprintf("%T", inf)
+      // z.GoType = fmt.Sprintf("%T", inf)
       z.Val[i] = getInspectableVal(inf, el, 0, 1)
     } else {
       // Handle the case where the value is nil
@@ -765,15 +802,15 @@ func doArray(v interface{}, rv reflect.Value) *ArrayVal {
 
   // TODO: add the 3 last original elements to end of new list, if space permits
 
-  //for i := 0; i < 3; i++ {
+  // for i := 0; i < 3; i++ {
   //  z.Val = append(z.Val, EmptyVal{EmptyVal: true})
-  //}
+  // }
   //
-  //var b = math.Max(3, float64(min-len))
+  // var b = math.Max(3, float64(min-len))
   //
-  //for i := int(b); i >= 0; i-- {
+  // for i := int(b); i >= 0; i-- {
   //  z.Val = append(z.Val, getInspectableVal(rv.Index(len-1-i).Interface(), 0))
-  //}
+  // }
 
   return &z
 }
@@ -797,8 +834,8 @@ type UnkVal struct {
 }
 
 func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) interface{} {
-  ///
-  //var rv = reflect.ValueOf(obj)
+  // /
+  // var rv = reflect.ValueOf(obj)
 
   if count > 11 {
     return obj
@@ -886,7 +923,7 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
       if z, ok := v.([]byte); ok {
         return string(z)
       }
-      //return v
+      // return v
     }
     return doArray(v, rv)
 
@@ -895,7 +932,7 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
       if z, ok := v.([]byte); ok {
         return string(z)
       }
-      //return v
+      // return v
     }
     return doArray(v, rv)
   }
@@ -1054,7 +1091,7 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
 }
 
 func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{}) {
-  ////
+  // //
   var newArgs = []interface{}{}
   var mf = NewMetaFields(&MF{})
 
@@ -1076,12 +1113,14 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
     } else if z, ok := x.(*LogId); ok {
       (*mf.m)["log_id"] = z.GetLogId()
       hasLogId = true
+      newArgs = append(newArgs, z.Val)
     } else if z, ok := x.(LogId); ok {
       (*mf.m)["log_id"] = z.GetLogId()
+      newArgs = append(newArgs, z.GetLogId())
       hasLogId = true
     } else {
 
-      if false && l.IsLoggingJSON {
+      if l.IsLoggingJSON {
         var xx = reflect.ValueOf(x)
         newArgs = append(newArgs, getInspectableVal(x, xx, 0, 1))
       } else {
@@ -1099,14 +1138,12 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
 }
 
 func (l *Logger) Info(args ...interface{}) {
-  fmt.Sprintln("000:", args)
   switch l.LogLevel {
   case ll.WARN, ll.ERROR:
     return
   }
   t := time.Now()
   var meta, newArgs = l.getMetaFields(&args)
-  fmt.Sprintln("111:", newArgs)
   l.writeSwitch(t, ll.INFO, meta, &newArgs)
 }
 
@@ -1319,6 +1356,6 @@ var DefaultLogger = CreateLogger("Default").
 
 func init() {
 
-  //log.SetFlags(log.LstdFlags | log.Llongfile)
+  // log.SetFlags(log.LstdFlags | log.Llongfile)
 
 }
