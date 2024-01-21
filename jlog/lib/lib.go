@@ -191,6 +191,10 @@ type LogId struct {
   Val string
 }
 
+func (x *LogId) GetLogId() string {
+  return x.Val
+}
+
 func (x *LogId) IsLogId() bool {
   return true
 }
@@ -650,6 +654,18 @@ type EmptyVal struct {
 
 func doMap(v interface{}, val reflect.Value) *MapVal {
 
+  if x, ok := v.(MapVal); ok {
+    return &x
+  }
+
+  if x, ok := v.(*MapVal); ok {
+    return x
+  }
+
+  if !val.IsValid() {
+    return nil
+  }
+
   var z = MapVal{
     GoType:       "<unknown>",
     TrueKeyCount: 0,
@@ -660,6 +676,17 @@ func doMap(v interface{}, val reflect.Value) *MapVal {
   len := val.Len()
   z.TrueKeyCount = len
   z.GoType = val.Type().String()
+
+  keyToRetrieve := "JLogMarker"
+
+  // Get the value associated with the key
+  keyValue := val.MapIndex(reflect.ValueOf(keyToRetrieve))
+
+  // Check if the key exists
+  if keyValue.IsValid() {
+    // Print the value
+    return &z
+  }
 
   keys := val.MapKeys()
 
@@ -677,7 +704,7 @@ func doMap(v interface{}, val reflect.Value) *MapVal {
     }
     var el = val.MapIndex(key)
     if el.IsValid() && el.CanInterface() {
-      z.Val[key] = getInspectableVal(el.Interface(), el, 0)
+      z.Val[key] = getInspectableVal(el.Interface(), el, 0, 1)
     } else {
       z.Val[key] = nil
     }
@@ -686,7 +713,7 @@ func doMap(v interface{}, val reflect.Value) *MapVal {
   for i := 0; i < min; i++ {
     el := val.Index(i)
     if el.IsValid() {
-      z.Val[i] = getInspectableVal(el.Interface(), el, 0)
+      z.Val[i] = getInspectableVal(el.Interface(), el, 0, 1)
     } else {
       // Handle the case where the value is nil
       z.Val[i] = nil // or any default value you want
@@ -696,7 +723,15 @@ func doMap(v interface{}, val reflect.Value) *MapVal {
   return &z
 }
 
-func doArray(v interface{}, val reflect.Value) *ArrayVal {
+func doArray(v interface{}, rv reflect.Value) *ArrayVal {
+
+  if x, ok := v.(ArrayVal); ok {
+    return &x
+  }
+
+  if x, ok := v.(*ArrayVal); ok {
+    return x
+  }
 
   var z = ArrayVal{
     TrueLen:     0,
@@ -705,10 +740,10 @@ func doArray(v interface{}, val reflect.Value) *ArrayVal {
     GoType:      "<unknown>",
   }
 
-  len := val.Len()
+  len := rv.Len()
   z.TrueLen = len
 
-  min := int(math.Min(float64(len), float64(25)))
+  min := int(math.Min(float64(len), float64(40)))
   if min < len {
     z.IsTruncated = true
   }
@@ -716,17 +751,19 @@ func doArray(v interface{}, val reflect.Value) *ArrayVal {
   z.Val = make([]interface{}, min)
 
   for i := 0; i < min; i++ {
-    el := val.Index(i)
-    z.GoType = fmt.Sprintf("%s", el.Type().String())
+    el := rv.Index(i)
     if el.IsValid() {
+      z.GoType = fmt.Sprintf("%s", el.Type().String())
       inf := el.Interface()
       //z.GoType = fmt.Sprintf("%T", inf)
-      z.Val[i] = getInspectableVal(inf, el, 0)
+      z.Val[i] = getInspectableVal(inf, el, 0, 1)
     } else {
       // Handle the case where the value is nil
       z.Val[i] = nil // or any default value you want
     }
   }
+
+  // TODO: add the 3 last original elements to end of new list, if space permits
 
   //for i := 0; i < 3; i++ {
   //  z.Val = append(z.Val, EmptyVal{EmptyVal: true})
@@ -735,7 +772,7 @@ func doArray(v interface{}, val reflect.Value) *ArrayVal {
   //var b = math.Max(3, float64(min-len))
   //
   //for i := int(b); i >= 0; i-- {
-  //  z.Val = append(z.Val, getInspectableVal(val.Index(len-1-i).Interface(), 0))
+  //  z.Val = append(z.Val, getInspectableVal(rv.Index(len-1-i).Interface(), 0))
   //}
 
   return &z
@@ -759,9 +796,13 @@ type UnkVal struct {
   ValAsStr string
 }
 
-func getInspectableVal(obj interface{}, rv reflect.Value, depth int) interface{} {
+func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) interface{} {
   ///
   //var rv = reflect.ValueOf(obj)
+
+  if count > 11 {
+    return obj
+  }
 
   if !rv.IsValid() {
     // Handle invalid reflection value (e.g., nil pointer)
@@ -781,13 +822,17 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int) interface{}
       return nil
     }
 
+    if !rv.IsValid() {
+      return nil
+    }
+
     rv = rv.Elem()
 
     if !rv.IsValid() {
       return nil
     }
 
-    v = rv.Interface()
+    return getInspectableVal(rv.Interface(), rv, depth, count+1)
   }
 
   if rv.Kind() == reflect.Interface {
@@ -807,67 +852,7 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int) interface{}
       return nil
     }
 
-    v = rv.Interface()
-  }
-
-  if rv.Kind() == reflect.Ptr {
-
-    if rv.IsNil() {
-      // Handle nil interface value
-      return nil
-    }
-
-    if !rv.IsValid() {
-      return nil
-    }
-
-    rv = rv.Elem()
-
-    if !rv.IsValid() {
-      return nil
-    }
-
-    v = rv.Interface()
-  }
-
-  if rv.Kind() == reflect.Interface {
-
-    if rv.IsNil() {
-      // Handle nil interface value
-      return nil
-    }
-
-    if !rv.IsValid() {
-      return nil
-    }
-
-    rv = rv.Elem()
-
-    if !rv.IsValid() {
-      return nil
-    }
-
-    v = rv.Interface()
-  }
-
-  if rv.Kind() == reflect.Ptr {
-
-    if rv.IsNil() {
-      // Handle nil interface value
-      return nil
-    }
-
-    if !rv.IsValid() {
-      return nil
-    }
-
-    rv = rv.Elem()
-
-    if !rv.IsValid() {
-      return nil
-    }
-
-    v = rv.Interface()
+    return getInspectableVal(rv.Interface(), rv, depth, count+1)
   }
 
   if v == nil {
@@ -895,6 +880,7 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int) interface{}
   }
 
   switch rv.Kind() {
+  //
   case reflect.Slice:
     if rv.Type().Elem().Kind() == reflect.Uint8 {
       if z, ok := v.([]byte); ok {
@@ -903,6 +889,7 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int) interface{}
       //return v
     }
     return doArray(v, rv)
+
   case reflect.Array:
     if rv.Type().Elem().Kind() == reflect.Uint8 {
       if z, ok := v.([]byte); ok {
@@ -1055,7 +1042,7 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int) interface{}
     }
 
     if field.CanInterface() {
-      innerResult[fieldName] = getInspectableVal(field.Interface(), field, depth+1)
+      innerResult[fieldName] = getInspectableVal(field.Interface(), field, depth+1, 1)
       continue
     }
 
@@ -1079,25 +1066,28 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
   var hasLogId = false
 
   for _, x := range *args {
-    var xx = reflect.ValueOf(x)
     if z, ok := x.(MetaFields); ok {
       for k, v := range *z.m {
-        m[k] = getInspectableVal(v, xx, 0)
+        m[k] = v
       }
     } else if z, ok := x.(*MetaFields); ok {
       for k, v := range *z.m {
-        m[k] = getInspectableVal(v, xx, 0)
+        m[k] = v
       }
     } else if z, ok := x.(*LogId); ok {
-      m["log_id"] = z.Val
+      m["log_id"] = z.GetLogId()
       hasLogId = true
     } else if z, ok := x.(LogId); ok {
-      m["log_id"] = z.Val
+      m["log_id"] = z.GetLogId()
       hasLogId = true
     } else {
 
-      newArgs = append(newArgs, getInspectableVal(x, xx, 0))
-      //newArgs = append(newArgs, x)
+      if l.IsLoggingJSON {
+        var xx = reflect.ValueOf(x)
+        newArgs = append(newArgs, getInspectableVal(x, xx, 0, 1))
+      } else {
+        newArgs = append(newArgs, x)
+      }
 
     }
   }

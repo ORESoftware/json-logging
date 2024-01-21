@@ -944,12 +944,25 @@ func cleanStructWorks(val reflect.Value, cache Cache) interface{} {
   return newStruct.Interface()
 }
 
+func hasField(obj interface{}, fieldName string) bool {
+  // Get the type and value of the struct
+  objType := reflect.TypeOf(obj)
+
+  // Check if the struct has the specified field
+  _, found := objType.FieldByName(fieldName)
+  return found
+}
+
 func cleanStruct(v interface{}, cache Cache) interface{} {
 
   rv := reflect.ValueOf(v)
 
   if !rv.IsValid() {
     return nil
+  }
+
+  if hasField(v, "JLogMarker") {
+    return v
   }
 
   // we turn struct into a map so we can display
@@ -962,6 +975,8 @@ func cleanStruct(v interface{}, cache Cache) interface{} {
   //  }
   //}
   //rv := rv.Elem() // Dereference the pointer to get the struct
+
+  ret["JLogMarker"] = true
 
   for i := 0; i < rv.NumField(); i++ {
 
@@ -1064,6 +1079,10 @@ func isNonComplexNum(kind reflect.Kind) bool {
 
 func CleanUp(v interface{}, cache Cache) (z interface{}) {
 
+  if v == nil {
+    return fmt.Sprintf("<nil> (%T)", v)
+  }
+
   rv := reflect.ValueOf(v)
 
   if !rv.IsValid() {
@@ -1165,15 +1184,6 @@ func CleanUp(v interface{}, cache Cache) (z interface{}) {
   }
 
   if rv.Kind() == reflect.Struct {
-    //panic("here")
-    //return copyStruct(v, cache)
-    //actualValue := rv.Elem()
-    //t := actualValue.Type()
-    //if t.Kind() != reflect.Interface {
-    //	intf := actualValue.Interface()
-    //	return cleanUp(intf, cache)
-    //}
-    //fmt.Println(rv)
     return cleanStruct(v, cache)
   }
 
