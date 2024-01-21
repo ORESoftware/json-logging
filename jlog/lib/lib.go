@@ -197,7 +197,7 @@ func (x *LogId) GetLogId(isHyperLink bool) string {
 
   // fmt.Println(fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", "Go to x", "Go to XX"))
 
-  if isHyperLink {
+  if false && isHyperLink {
     // return au.Col.Blue("xyz1").Hyperlink(fmt.Sprintf("foobarbas", x.Val)).HyperlinkTarget()
 
     return au.Col.Hyperlink("foo", "https://foo.com").String()
