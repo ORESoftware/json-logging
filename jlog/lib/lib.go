@@ -937,7 +937,7 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
       if z, ok := v.([]byte); ok {
         return string(z)
       }
-      // return v
+      return v
     }
     return doArray(v, rv)
 
@@ -946,7 +946,7 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
       if z, ok := v.([]byte); ok {
         return string(z)
       }
-      // return v
+      return v
     }
     return doArray(v, rv)
   }
@@ -957,9 +957,8 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
 
   if rv.Kind() != reflect.Struct {
     // if it's a not a struct now
-
-    var str = fmt.Sprintf("%v", v)
-    var t = fmt.Sprintf("%T", v)
+    var str = fmt.Sprintf("(%v / %v)", v, rv.Type().String())
+    var t = fmt.Sprintf("(%T / %v)", v, rv.Type().String())
     return &UnkVal{
       GoType:   t,
       Val:      v,
@@ -970,7 +969,12 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
   // it's a struct, so we can add metadata to it
   var errStr = ""
   var toString = ""
+
   var typeStr = fmt.Sprintf("%T", v)
+
+  if rv.IsValid() && rv.CanInterface() {
+    typeStr = fmt.Sprintf("(%T / %v)", v, rv.Type().String())
+  }
 
   if z, ok := v.(error); ok {
     errStr = z.Error()
@@ -1009,87 +1013,55 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
       continue
     }
 
-    if field.Kind() == reflect.Ptr {
+    for {
+
+      if !(field.Kind() == reflect.Ptr || field.Kind() == reflect.Interface) {
+        break
+      }
+
+      if !field.IsValid() {
+        innerResult[fieldName] = nil
+        break
+      }
 
       if field.IsNil() {
         innerResult[fieldName] = nil
-        continue
+        break
       }
 
       field = field.Elem()
 
       if !field.IsValid() {
         innerResult[fieldName] = nil
-        continue
+        break
       }
 
     }
 
-    if field.Kind() == reflect.Interface {
-
-      if field.IsNil() {
-        innerResult[fieldName] = nil
-        continue
-      }
-
-      field = field.Elem()
-
-      if !field.IsValid() {
-        innerResult[fieldName] = nil
-        continue
-      }
-    }
-
-    if field.Kind() == reflect.Ptr {
-
-      if field.IsNil() {
-        innerResult[fieldName] = nil
-        continue
-      }
-
-      field = field.Elem()
-
-      if !field.IsValid() {
-        innerResult[fieldName] = nil
-        continue
-      }
-
-    }
-
-    if field.Kind() == reflect.Interface {
-
-      if field.IsNil() {
-        innerResult[fieldName] = nil
-        continue
-      }
-
-      field = field.Elem()
-
-      if !field.IsValid() {
-        innerResult[fieldName] = nil
-        continue
-      }
-    }
-
-    if field.Kind() == reflect.Ptr {
-
-      if field.IsNil() {
-        innerResult[fieldName] = nil
-        continue
-      }
-
-      field = field.Elem()
-
-      if !field.IsValid() {
-        innerResult[fieldName] = nil
-        continue
-      }
-
-    }
-
-    if !field.IsValid() {
-      innerResult[fieldName] = nil
+    if _, ok := innerResult[fieldName]; ok {
       continue
+    }
+
+    if field.Kind() == reflect.Interface || field.Kind() == reflect.Ptr {
+
+      if field.IsNil() {
+        innerResult[fieldName] = nil
+        continue
+      }
+
+      if !field.IsValid() {
+        innerResult[fieldName] = nil
+        continue
+      }
+
+      field = field.Elem()
+
+      if !field.IsValid() {
+        innerResult[fieldName] = nil
+        continue
+      }
+
+      return fmt.Sprintf("%T / %v", field.Interface(), field.Interface())
     }
 
     if field.CanInterface() {

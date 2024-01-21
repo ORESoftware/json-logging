@@ -232,7 +232,7 @@ func handleStruct(obj interface{}, size int, brk bool, depth int, cache *map[*in
   t := rv.Type()
 
   if n < 1 {
-    return fmt.Sprintf(" %s { }", t.Name())
+    return fmt.Sprintf(" (%s / %s) { }", t.Name, t.String())
   }
 
   //log.Println("ln:", ln)
@@ -274,10 +274,8 @@ func handleStruct(obj interface{}, size int, brk bool, depth int, cache *map[*in
     }
 
     z := getStringRepresentation(v, size, brk, depth+1, cache)
-
     values = append(values, z)
     size = size + len(z)
-
   }
 
   if size > 100-depth {
@@ -285,15 +283,20 @@ func handleStruct(obj interface{}, size int, brk bool, depth int, cache *map[*in
   }
 
   var b strings.Builder
-  b.WriteString(t.Name() + " {" + createNewline(brk, n > 0))
+  b.WriteString(fmt.Sprintf("(%s)", t.String()))
+  b.WriteString(" {" + createNewline(brk, n > 0))
 
   for i := 0; i < n; i++ {
     var k = aurora.Bold(aurora.Blue(keys[i])).String()
     b.WriteString(createSpaces(depth, brk) + k)
-    b.WriteString(" " + values[i] + addComma(i, n) + createNewline(brk, n > 0))
+    b.WriteString(" ")
+    b.WriteString(values[i])
+    b.WriteString(addComma(i, n))
+    b.WriteString(createNewline(brk, n > 0))
   }
 
-  b.WriteString(createSpaces(depth-1, brk) + "}" + createNewline(brk, false))
+  b.WriteString(createSpaces(depth-1, brk) + "}")
+  b.WriteString(createNewline(brk, false))
   return b.String()
 }
 
@@ -316,16 +319,10 @@ func GetFuncSignature(v interface{}) string {
   for i := 0; i < funcType.NumIn(); i++ {
     vv := funcType.In(i)
     nm := vv.Name()
-    if vv.Kind() == reflect.Ptr {
+    switch vv.Kind() {
+    case reflect.Pointer, reflect.UnsafePointer:
       nm = vv.Elem().Name()
-    }
-    if vv.Kind() == reflect.Pointer {
-      nm = vv.Elem().Name()
-    }
-    if vv.Kind() == reflect.UnsafePointer {
-      nm = vv.Elem().Name()
-    }
-    if vv.Kind() == reflect.Func {
+    case reflect.Func:
       nm = vv.Elem().Name()
       if strings.TrimSpace(nm) == "" {
         nm = "func"
@@ -473,7 +470,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
   }
 
   if rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Ptr {
-    return fmt.Sprintf("pointer /interface -> (%v)", rv.Type())
+    return fmt.Sprintf("pointer /interface -> (%v)", rv.Type().String())
   }
 
   if z, ok := v.(string); ok {
@@ -481,7 +478,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
   }
 
   if kind == reflect.Chan {
-    return fmt.Sprintf("(chan %s)", rv.Type().Elem().String())
+    return fmt.Sprintf("(chan (%s) %v)", rv.Type().Elem().String(), rv.Elem().Interface())
   }
 
   if kind == reflect.Map {
