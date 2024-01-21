@@ -1056,11 +1056,10 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
 func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{}) {
   ////
   var newArgs = []interface{}{}
-  var m = MF{}
-  var mf = NewMetaFields(&m)
+  var mf = NewMetaFields(&MF{})
 
   for k, v := range *l.MetaFields.m {
-    m[k] = v
+    (*mf.m)[k] = v
   }
 
   var hasLogId = false
@@ -1068,21 +1067,21 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
   for _, x := range *args {
     if z, ok := x.(MetaFields); ok {
       for k, v := range *z.m {
-        m[k] = v
+        (*mf.m)[k] = v
       }
     } else if z, ok := x.(*MetaFields); ok {
       for k, v := range *z.m {
-        m[k] = v
+        (*mf.m)[k] = v
       }
     } else if z, ok := x.(*LogId); ok {
-      m["log_id"] = z.GetLogId()
+      (*mf.m)["log_id"] = z.GetLogId()
       hasLogId = true
     } else if z, ok := x.(LogId); ok {
-      m["log_id"] = z.GetLogId()
+      (*mf.m)["log_id"] = z.GetLogId()
       hasLogId = true
     } else {
 
-      if l.IsLoggingJSON {
+      if false && l.IsLoggingJSON {
         var xx = reflect.ValueOf(x)
         newArgs = append(newArgs, getInspectableVal(x, xx, 0, 1))
       } else {
@@ -1100,14 +1099,14 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
 }
 
 func (l *Logger) Info(args ...interface{}) {
+  fmt.Sprintln("000:", args)
   switch l.LogLevel {
   case ll.WARN, ll.ERROR:
     return
   }
   t := time.Now()
-  // fmt.Sprintln("000:", args)
   var meta, newArgs = l.getMetaFields(&args)
-  // fmt.Sprintln("111:", newArgs)
+  fmt.Sprintln("111:", newArgs)
   l.writeSwitch(t, ll.INFO, meta, &newArgs)
 }
 
