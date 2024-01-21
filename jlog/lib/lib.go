@@ -21,6 +21,7 @@ import (
   "sync"
   "time"
   "runtime/debug"
+  au "github.com/oresoftware/json-logging/jlog/aurora"
   "math"
 )
 
@@ -191,8 +192,17 @@ type LogId struct {
   Val string
 }
 
-func (x *LogId) GetLogId() string {
-  return fmt.Sprintf("(log-id: '%s')", x.Val)
+func (x *LogId) GetLogId(isHyperLink bool) string {
+  // fmt.Println("\\e]8;;http://example.com\aThis is the link\\e]8;;\\e\\")
+  // fmt.Println(fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", "https://linkedin.com", "Go to Linked"))
+
+  fmt.Println(fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", "Go to Linked", "https://linkedin.com"))
+
+  if isHyperLink {
+    return au.Col.Blue("(Goto -> LogId)").Hyperlink(fmt.Sprintf("http://vibeirl.com/dev/links?%s", x.Val)).String()
+  } else {
+    return fmt.Sprintf("(log-id:'%s')", x.Val)
+  }
 }
 
 func (x *LogId) IsLogId() bool {
@@ -1111,12 +1121,12 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
         (*mf.m)[k] = v
       }
     } else if z, ok := x.(*LogId); ok {
-      (*mf.m)["log_id"] = z.GetLogId()
+      (*mf.m)["log_id"] = z.GetLogId(true)
       hasLogId = true
-      newArgs = append(newArgs, z.Val)
+      newArgs = append(newArgs, z.GetLogId(true))
     } else if z, ok := x.(LogId); ok {
-      (*mf.m)["log_id"] = z.GetLogId()
-      newArgs = append(newArgs, z.GetLogId())
+      (*mf.m)["log_id"] = z.GetLogId(true)
+      newArgs = append(newArgs, z.GetLogId(true))
       hasLogId = true
     } else {
 
@@ -1144,6 +1154,7 @@ func (l *Logger) Info(args ...interface{}) {
   }
   t := time.Now()
   var meta, newArgs = l.getMetaFields(&args)
+  fmt.Println("new args:", newArgs)
   l.writeSwitch(t, ll.INFO, meta, &newArgs)
 }
 
