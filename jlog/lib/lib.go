@@ -865,27 +865,7 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
     return v
   }
 
-  if rv.Kind() == reflect.Ptr {
-
-    if rv.IsNil() {
-      // Handle nil interface value
-      return nil
-    }
-
-    if !rv.IsValid() {
-      return nil
-    }
-
-    rv = rv.Elem()
-
-    if !rv.IsValid() {
-      return nil
-    }
-
-    return getInspectableVal(rv.Interface(), rv, depth, count+1)
-  }
-
-  if rv.Kind() == reflect.Interface {
+  if rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Interface {
 
     if rv.IsNil() {
       // Handle nil interface value
@@ -921,9 +901,9 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
     return x
   }
 
-  if depth > 3 {
-    return v
-  }
+  //if depth > 3 {
+  //  return v
+  //}
 
   if !rv.IsValid() {
     return nil
