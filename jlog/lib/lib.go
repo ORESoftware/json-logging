@@ -992,7 +992,14 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
       continue
     }
 
+    j :=0;
+
     for {
+
+      if j++; j > 9 {
+        // only try to deref so many times - perhaps it's a ptr to a ptr, etc
+        break;
+      }
 
       if !(field.Kind() == reflect.Ptr || field.Kind() == reflect.Interface) {
         break
@@ -1048,7 +1055,7 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
       continue
     }
 
-    innerResult[fieldName] = fmt.Sprintf("%v (%s) (Type: %s)", field, field.String(), field.Type().String())
+    innerResult[fieldName] = fmt.Sprintf("%v (Type: %s)", field.String(), field.Type().String())
     continue
   }
 
@@ -1078,10 +1085,10 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
     } else if z, ok := x.(*LogId); ok {
       (*mf.m)["log_id"] = z.GetLogId(true)
       hasLogId = true
-      newArgs = append(newArgs, z.GetLogId(true))
+      //newArgs = append(newArgs, z.GetLogId(true))
     } else if z, ok := x.(LogId); ok {
       (*mf.m)["log_id"] = z.GetLogId(true)
-      newArgs = append(newArgs, z.GetLogId(true))
+      //newArgs = append(newArgs, z.GetLogId(true))
       hasLogId = true
     } else {
 
