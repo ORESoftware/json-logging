@@ -22,6 +22,7 @@ import (
   "time"
   "runtime/debug"
   "math"
+  "encoding/base64"
 )
 
 func writeToStderr(args ...interface{}) {
@@ -30,6 +31,28 @@ func writeToStderr(args ...interface{}) {
     fmt.Println("adcca45f-8d7b-4d4a-8fd2-7683b7b375b5", "could not write to stderr:", err)
   }
   safeStderr.Unlock()
+}
+
+
+func isBase64Perf(s string) bool {
+  if len(s) > 0 && s[len(s) - 1] == '=' {
+    return true;
+  }
+  return false;
+}
+
+func isBase64(s string) bool {
+  _, err := base64.StdEncoding.DecodeString(s)
+  return err == nil
+}
+
+// base64ToString decodes a base64-encoded string to a regular string
+func base64ToString(s string) (string, error) {
+  decodedBytes, err := base64.StdEncoding.DecodeString(s)
+  if err != nil {
+    return "", err
+  }
+  return string(decodedBytes), nil
 }
 
 var safeStdout = writer.NewSafeWriter(os.Stdout)
@@ -584,7 +607,7 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
     if err != nil {
 
       _, file, line, _ := runtime.Caller(3)
-      DefaultLogger.Warn("could not marshal the slice:", err.Error(), "file://"+file+":"+strconv.Itoa(line))
+      DefaultLogger.Warn("json-logging: 1: could not marshal the slice:", err.Error(), "file://"+file+":"+strconv.Itoa(line))
 
       // cleaned := make([]interface{},0)
 
@@ -602,9 +625,11 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
       buf, err = json.Marshal([8]interface{}{"@bunion:v1", l.AppName, level, pid, l.HostName, date, mf.m, cleaned})
 
       if err != nil {
-        fmt.Println(errors.New("Json-Logging: could not marshal the slice: " + err.Error()))
-        return
+        fmt.Println(errors.New("Json-Logging: 2: could not marshal the slice: " + err.Error()))
       }
+
+      fmt.Println("json-logging: cleaned:", cleaned)
+
     }
 
     shared.M1.Lock()
@@ -695,7 +720,7 @@ type MapVal struct {
   GoType       string
   TrueKeyCount int
   IsTruncated  bool
-  Val          map[interface{}]interface{}
+  Val          map[string]interface{}
 }
 
 type EmptyVal struct {
@@ -745,7 +770,7 @@ func doMap(v interface{}, val reflect.Value) *MapVal {
     z.IsTruncated = true
   }
 
-  z.Val = map[interface{}]interface{}{}
+  z.Val = map[string]interface{}{}
 
   i := 0
   for _, key := range keys {
@@ -754,9 +779,9 @@ func doMap(v interface{}, val reflect.Value) *MapVal {
     }
     var el = val.MapIndex(key)
     if el.IsValid() && el.CanInterface() {
-      z.Val[key] = getInspectableVal(el.Interface(), el, 0, 1)
+      z.Val[fmt.Sprintf("%v", key)] = getInspectableVal(el.Interface(), el, 0, 1)
     } else {
-      z.Val[key] = nil
+      z.Val[fmt.Sprintf("%v", key)] = nil
     }
   }
 
@@ -928,6 +953,14 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
       return v
     }
     return doArray(v, rv)
+  }
+
+  if rv.Kind() == reflect.Func {
+    return fmt.Sprintf("(func())")
+  }
+
+  if rv.Kind() == reflect.Chan {
+    return fmt.Sprintf("(chan (%s) %v)", rv.Type().Elem().String(), rv.Elem().Interface())
   }
 
   if rv.Kind() == reflect.Map {
