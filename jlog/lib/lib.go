@@ -626,10 +626,10 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
 
       if err != nil {
         fmt.Println(errors.New("Json-Logging: 2: could not marshal the slice: " + err.Error()))
+        return;
       }
 
-      fmt.Println("json-logging: cleaned:", cleaned)
-
+      //fmt.Println("json-logging: cleaned:", cleaned)
     }
 
     shared.M1.Lock()
@@ -985,7 +985,10 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
   var typeStr = fmt.Sprintf("%T", v)
 
   if rv.IsValid() && rv.CanInterface() {
-    typeStr = fmt.Sprintf("(%T / %v)", v, rv.Type().String())
+    z := rv.Type().String()
+    if z != typeStr {
+      typeStr = fmt.Sprintf("(%T / %v)", v, z)
+    }
   }
 
   if z, ok := v.(error); ok {
