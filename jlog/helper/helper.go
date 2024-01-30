@@ -50,6 +50,7 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
 
     var count = 0
     for count++; i < 9; {
+
       if !(val.Kind() == reflect.Ptr || val.Kind() == reflect.Interface) {
         break
       }
@@ -58,7 +59,9 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
         z.WriteString(fmt.Sprintf("<nil 0000010> (%T)", m))
         break
       }
+
       val = val.Elem()
+
       if !val.IsValid() {
         z.WriteString(fmt.Sprintf("'%s'", Cyan(fmt.Sprintf("%s", k.Interface())).String()))
         z.WriteString(Bold(" —> ").String())
@@ -66,6 +69,7 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
         z.WriteString(addComma(i, n))
         break
       }
+
       m = val.Interface()
     }
 
@@ -74,6 +78,11 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
       z.WriteString(Bold(" —> ").String())
       z.WriteString(fmt.Sprintf("%v / %v", m, ptr))
       z.WriteString(addComma(i, n))
+      {
+        str := z.String()
+        size = size + len(str)
+        values = append(values, str)
+      }
       continue
     }
 
@@ -82,6 +91,11 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
       z.WriteString(Bold(" —> ").String())
       z.WriteString(fmt.Sprintf(" 000 %v (%T)", m, m))
       z.WriteString(addComma(i, n))
+      {
+        str := z.String()
+        size = size + len(str)
+        values = append(values, str)
+      }
       continue
     }
 
@@ -106,6 +120,11 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
       z.WriteString(Bold(" —> ").String())
       z.WriteString(fmt.Sprintf("%v / %v", m, ptr))
       z.WriteString(addComma(i, n))
+      {
+        str := z.String()
+        size = size + len(str)
+        values = append(values, str)
+      }
       continue
     }
 
