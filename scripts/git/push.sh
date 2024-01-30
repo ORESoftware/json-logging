@@ -9,7 +9,9 @@ fi
 ## Make sure it can compile before pushing
 echo 'Compile go project to /dev/null so we dont push code that doesnt work lol'
 go build -p 6 -o '/dev/null' -v "$PWD/jlog/lib"
+echo 'Compile ./jlog to /dev/null....'
 go build -p 6 -o '/dev/null' -v "$PWD/jlog/mult"
+echo 'Compile ./test to /dev/null'
 go build -p 6 -o '/dev/null' -v "$PWD/test"
 
 ssh-add -D
