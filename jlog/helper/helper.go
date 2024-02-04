@@ -506,7 +506,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 
   if kind == reflect.Slice {
     if m, ok := v.(Stringer); ok {
-      return fmt.Sprintf("%T - (As string: %s)", m)
+      return fmt.Sprintf("%T - (As string: %s)", m, m)
     } else {
       return handleSliceAndArray(v, size, brk, depth, cache)
     }
@@ -514,7 +514,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 
   if kind == reflect.Array {
     if m, ok := v.(Stringer); ok {
-      return fmt.Sprintf("(%T (As string: '%s'))", m)
+      return fmt.Sprintf("(%T (As string: '%s'))", m, m)
     } else {
       return handleSliceAndArray(v, size, brk, depth, cache)
     }

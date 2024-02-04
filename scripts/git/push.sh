@@ -2,8 +2,13 @@
 
 set -eo pipefail;
 
-if [[ -f "$PWD/wss/package.json" ]]; then
-    cd "$PWD/wss"
+
+if [[ -f "$(cd .. && pwd)/go.mod" ]]; then
+    cd ..
+fi
+
+if [[ -f "$PWD/json-logging/go.mod" ]]; then
+    cd "$PWD/json-logging"
 fi
 
 ## Make sure it can compile before pushing
