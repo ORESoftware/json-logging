@@ -447,13 +447,13 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
   }
 
   if v == nil {
-    return "<nil-8>"
+    return "<nil (nil)>"
   }
 
   var rv = reflect.ValueOf(v)
 
   if !rv.IsValid() {
-    return "<nil 119>"
+    return "<nil (invalid)>"
   }
 
   var kind = rv.Kind()

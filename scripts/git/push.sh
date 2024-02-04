@@ -2,7 +2,6 @@
 
 set -eo pipefail;
 
-
 if [[ -f "$(cd .. && pwd)/go.mod" ]]; then
     cd ..
 fi
