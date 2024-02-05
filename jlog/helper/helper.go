@@ -56,7 +56,11 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
       }
 
       if val.IsNil() {
-        z.WriteString(fmt.Sprintf("<nil 0000010> (%T)", m))
+        z.WriteString(fmt.Sprintf("<nil (%T)>", m))
+        break
+      }
+
+      if val.Kind() == reflect.Chan {
         break
       }
 
@@ -89,7 +93,7 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
     if m == nil {
       z.WriteString(fmt.Sprintf("'%s'", Cyan(fmt.Sprintf("%s", k.Interface())).String()))
       z.WriteString(Bold(" —> ").String())
-      z.WriteString(fmt.Sprintf(" 000 %v (%T)", m, m))
+      z.WriteString(fmt.Sprintf("%v (%T)", m, m))
       z.WriteString(addComma(i, n))
       {
         str := z.String()
@@ -108,11 +112,14 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
       // Handle the case where rf is not addressable
       // You might need to create a copy or take a different approach
       // Example: Creating a copy
-      myCopy := reflect.New(val.Type()).Elem()
-      myCopy.Set(val)
-      val = myCopy
-      m = myCopy.Interface()
-      ptr = myCopy.Addr().Pointer()
+
+      if val.Kind() != reflect.Chan {
+        myCopy := reflect.New(val.Type()).Elem()
+        myCopy.Set(val)
+        val = myCopy
+        m = myCopy.Interface()
+        ptr = myCopy.Addr().Pointer()
+      }
     }
 
     if !val.IsValid() {
@@ -183,6 +190,10 @@ func handleSliceAndArray(v interface{}, len int, brk bool, depth int, cache *map
   t := rv.Type()
 
   if n < 1 {
+    return Black("[").String() + "" + Black(fmt.Sprintf("] (empty %v)", t)).String()
+  }
+
+  if rv.Kind() == reflect.Chan {
     return Black("[").String() + "" + Black(fmt.Sprintf("] (empty %v)", t)).String()
   }
 
@@ -468,6 +479,10 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
       return "<nil>"
     }
 
+    if kind == reflect.Chan {
+      return fmt.Sprintf("(%v (%T))", v, v)
+    }
+
     rv = rv.Elem()
 
     if !rv.IsValid() { // Check if the dereferenced value is valid
@@ -489,7 +504,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
   }
 
   if rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Ptr {
-    return fmt.Sprintf("pointer /interface -> (%v)", rv.Type().String())
+    return fmt.Sprintf("pointer/interface -> (%v)", rv.Type().String())
   }
 
   if z, ok := v.(string); ok {
@@ -668,6 +683,12 @@ func DoCopyAndDerefStruct(s interface{}) interface{} {
     return nil
   }
 
+  var kind = rv.Kind()
+
+  if kind == reflect.Chan {
+    return fmt.Sprintf("(%v (%T))", s, s)
+  }
+
   val := rv.Elem()
   newStruct := reflect.New(val.Type()).Elem()
 
@@ -690,6 +711,10 @@ func CopyAndDereference(s interface{}) interface{} {
 
   if !val.IsValid() {
     return nil
+  }
+
+  if val.Kind() == reflect.Chan {
+    return fmt.Sprintf("(%v (%T))", s, s)
   }
 
   // Dereference pointer if s is a pointer
