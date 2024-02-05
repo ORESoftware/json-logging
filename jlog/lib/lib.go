@@ -1173,6 +1173,14 @@ func (l *Logger) Error(args ...interface{}) {
   l.writeSwitch(t, ll.ERROR, meta, &newArgs)
 }
 
+func (l *Logger) Critical(args ...interface{}) {
+  t := time.Now()
+  var meta, newArgs = l.getMetaFields(&args)
+  filteredStackTrace := hlpr.GetFilteredStacktrace()
+  newArgs = append(newArgs, StackTrace{filteredStackTrace})
+  l.writeSwitch(t, ll.CRITICAL, meta, &newArgs)
+}
+
 func (l *Logger) Debug(args ...interface{}) {
   switch l.LogLevel {
   case ll.INFO, ll.WARN, ll.ERROR:
@@ -1280,9 +1288,27 @@ func (l *Logger) Tags(z *map[string]interface{}) *Logger {
   return l.Create(z)
 }
 
+func (l *Logger) TraceF(s string, args ...interface{}) {
+  switch l.LogLevel {
+  case ll.DEBUG, ll.INFO, ll.WARN, ll.ERROR, ll.CRITICAL:
+    return
+  }
+  t := time.Now()
+  l.writeSwitch(t, ll.TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+}
+
+func (l *Logger) DebugF(s string, args ...interface{}) {
+  switch l.LogLevel {
+  case ll.INFO, ll.WARN, ll.ERROR, ll.CRITICAL:
+    return
+  }
+  t := time.Now()
+  l.writeSwitch(t, ll.DEBUG, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+}
+
 func (l *Logger) InfoF(s string, args ...interface{}) {
   switch l.LogLevel {
-  case ll.WARN, ll.ERROR:
+  case ll.WARN, ll.ERROR, ll.CRITICAL:
     return
   }
   t := time.Now()
@@ -1291,7 +1317,7 @@ func (l *Logger) InfoF(s string, args ...interface{}) {
 
 func (l *Logger) WarnF(s string, args ...interface{}) {
   switch l.LogLevel {
-  case ll.ERROR:
+  case ll.ERROR, ll.CRITICAL:
     return
   }
   t := time.Now()
@@ -1303,29 +1329,24 @@ type StackTrace struct {
 }
 
 func (l *Logger) ErrorF(s string, args ...interface{}) {
+  switch l.LogLevel {
+  case ll.CRITICAL:
+    // only logging critical level messages!
+    return
+  }
   t := time.Now()
   filteredStackTrace := hlpr.GetFilteredStacktrace()
   formattedString := fmt.Sprintf(s, args...)
   l.writeSwitch(t, ll.ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
-func (l *Logger) DebugF(s string, args ...interface{}) {
-  switch l.LogLevel {
-  case ll.INFO, ll.WARN, ll.ERROR:
-    return
-  }
+func (l *Logger) CriticalF(s string, args ...interface{}) {
   t := time.Now()
-  l.writeSwitch(t, ll.DEBUG, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+  filteredStackTrace := hlpr.GetFilteredStacktrace()
+  formattedString := fmt.Sprintf(s, args...)
+  l.writeSwitch(t, ll.CRITICAL, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
-func (l *Logger) TraceF(s string, args ...interface{}) {
-  switch l.LogLevel {
-  case ll.DEBUG, ll.INFO, ll.WARN, ll.ERROR:
-    return
-  }
-  t := time.Now()
-  l.writeSwitch(t, ll.TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
-}
 
 func (l *Logger) NewLine() {
   safeStdout.Write([]byte("\n"))

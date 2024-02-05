@@ -8,4 +8,5 @@ const (
 	INFO  LogLevel = iota
 	WARN  LogLevel = iota
 	ERROR LogLevel = iota
+  CRITICAL LogLevel = iota
 )
