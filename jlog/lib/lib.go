@@ -33,12 +33,11 @@ func writeToStderr(args ...interface{}) {
   safeStderr.Unlock()
 }
 
-
 func isBase64Perf(s string) bool {
-  if len(s) > 0 && s[len(s) - 1] == '=' {
-    return true;
+  if len(s) > 0 && s[len(s)-1] == '=' {
+    return true
   }
-  return false;
+  return false
 }
 
 func isBase64(s string) bool {
@@ -626,7 +625,7 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
 
       if err != nil {
         fmt.Println(errors.New("Json-Logging: 2: could not marshal the slice: " + err.Error()))
-        return;
+        return
       }
 
       //fmt.Println("json-logging: cleaned:", cleaned)
@@ -1028,13 +1027,13 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
       continue
     }
 
-    j :=0;
+    j := 0
 
     for {
 
       if j++; j > 9 {
         // only try to deref so many times - perhaps it's a ptr to a ptr, etc
-        break;
+        break
       }
 
       if !(field.Kind() == reflect.Ptr || field.Kind() == reflect.Interface) {
@@ -1145,9 +1144,29 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
   return mf, newArgs
 }
 
+func (l *Logger) Trace(args ...interface{}) {
+  switch l.LogLevel {
+  case ll.DEBUG, ll.INFO, ll.WARN, ll.ERROR, ll.CRITICAL:
+    return
+  }
+  t := time.Now()
+  var meta, newArgs = l.getMetaFields(&args)
+  l.writeSwitch(t, ll.TRACE, meta, &newArgs)
+}
+
+func (l *Logger) Debug(args ...interface{}) {
+  switch l.LogLevel {
+  case ll.INFO, ll.WARN, ll.ERROR, ll.CRITICAL:
+    return
+  }
+  t := time.Now()
+  var meta, newArgs = l.getMetaFields(&args)
+  l.writeSwitch(t, ll.DEBUG, meta, &newArgs)
+}
+
 func (l *Logger) Info(args ...interface{}) {
   switch l.LogLevel {
-  case ll.WARN, ll.ERROR:
+  case ll.WARN, ll.ERROR, ll.CRITICAL:
     return
   }
   t := time.Now()
@@ -1157,7 +1176,7 @@ func (l *Logger) Info(args ...interface{}) {
 
 func (l *Logger) Warn(args ...interface{}) {
   switch l.LogLevel {
-  case ll.ERROR:
+  case ll.ERROR, ll.CRITICAL:
     return
   }
   t := time.Now()
@@ -1166,6 +1185,10 @@ func (l *Logger) Warn(args ...interface{}) {
 }
 
 func (l *Logger) Error(args ...interface{}) {
+  switch l.LogLevel {
+  case ll.CRITICAL:
+    return
+  }
   t := time.Now()
   var meta, newArgs = l.getMetaFields(&args)
   filteredStackTrace := hlpr.GetFilteredStacktrace()
@@ -1179,26 +1202,6 @@ func (l *Logger) Critical(args ...interface{}) {
   filteredStackTrace := hlpr.GetFilteredStacktrace()
   newArgs = append(newArgs, StackTrace{filteredStackTrace})
   l.writeSwitch(t, ll.CRITICAL, meta, &newArgs)
-}
-
-func (l *Logger) Debug(args ...interface{}) {
-  switch l.LogLevel {
-  case ll.INFO, ll.WARN, ll.ERROR:
-    return
-  }
-  t := time.Now()
-  var meta, newArgs = l.getMetaFields(&args)
-  l.writeSwitch(t, ll.DEBUG, meta, &newArgs)
-}
-
-func (l *Logger) Trace(args ...interface{}) {
-  switch l.LogLevel {
-  case ll.DEBUG, ll.INFO, ll.WARN, ll.ERROR:
-    return
-  }
-  t := time.Now()
-  var meta, newArgs = l.getMetaFields(&args)
-  l.writeSwitch(t, ll.TRACE, meta, &newArgs)
 }
 
 type errorIdMarker struct{}
@@ -1346,7 +1349,6 @@ func (l *Logger) CriticalF(s string, args ...interface{}) {
   formattedString := fmt.Sprintf(s, args...)
   l.writeSwitch(t, ll.CRITICAL, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
-
 
 func (l *Logger) NewLine() {
   safeStdout.Write([]byte("\n"))
