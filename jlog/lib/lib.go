@@ -226,7 +226,8 @@ func (x *LogId) GetLogId(isHyperLink bool) string {
     return au.Col.Hyperlink("foo", "https://foo.com").HyperlinkTarget()
     // return au.Col.Blue("(Goto -> LogId)").Hyperlink(fmt.Sprintf("http://vibeirl.com/dev/links?%s", x.Val)).HyperlinkTarget()
   } else {
-    return fmt.Sprintf("(log-id:'%s')", x.Val)
+    //return fmt.Sprintf("(log-id:'%s')", x.Val)
+    return x.Val
   }
 }
 
