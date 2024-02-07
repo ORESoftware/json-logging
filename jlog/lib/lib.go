@@ -1301,7 +1301,8 @@ func (l *Logger) TraceF(s string, args ...interface{}) {
 		return
 	}
 	t := time.Now()
-	l.writeSwitch(t, ll.TRACE, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+  var meta = l.MetaFields
+	l.writeSwitch(t, ll.TRACE, meta, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) DebugF(s string, args ...interface{}) {
@@ -1310,7 +1311,8 @@ func (l *Logger) DebugF(s string, args ...interface{}) {
 		return
 	}
 	t := time.Now()
-	l.writeSwitch(t, ll.DEBUG, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+  var meta = l.MetaFields
+	l.writeSwitch(t, ll.DEBUG, meta, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) InfoF(s string, args ...interface{}) {
@@ -1319,7 +1321,8 @@ func (l *Logger) InfoF(s string, args ...interface{}) {
 		return
 	}
 	t := time.Now()
-	l.writeSwitch(t, ll.INFO, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+  var meta = l.MetaFields
+	l.writeSwitch(t, ll.INFO, meta, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) WarnF(s string, args ...interface{}) {
@@ -1328,7 +1331,8 @@ func (l *Logger) WarnF(s string, args ...interface{}) {
 		return
 	}
 	t := time.Now()
-	l.writeSwitch(t, ll.WARN, nil, &[]interface{}{fmt.Sprintf(s, args...)})
+  var meta = l.MetaFields
+	l.writeSwitch(t, ll.WARN, meta, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 type StackTrace struct {
@@ -1344,14 +1348,16 @@ func (l *Logger) ErrorF(s string, args ...interface{}) {
 	t := time.Now()
 	filteredStackTrace := hlpr.GetFilteredStacktrace()
 	formattedString := fmt.Sprintf(s, args...)
-	l.writeSwitch(t, ll.ERROR, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
+  var meta = l.MetaFields
+	l.writeSwitch(t, ll.ERROR, meta, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
 func (l *Logger) CriticalF(s string, args ...interface{}) {
 	t := time.Now()
 	filteredStackTrace := hlpr.GetFilteredStacktrace()
 	formattedString := fmt.Sprintf(s, args...)
-	l.writeSwitch(t, ll.CRITICAL, nil, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
+  var meta = l.MetaFields
+	l.writeSwitch(t, ll.CRITICAL, meta, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
 func (l *Logger) NewLine() {

@@ -1119,9 +1119,9 @@ func GetFilteredStacktrace() *[]string {
   var filteredLines = []string{}
   for _, line := range lines {
 
-    if strings.Contains(line, "oresoftware/json-logging") {
-      continue
-    }
+    // if strings.Contains(line, "oresoftware/json-logging") {
+    //   continue
+    // }
 
     if !strings.Contains(line, ".go:") {
       continue
