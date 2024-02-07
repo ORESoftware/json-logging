@@ -221,13 +221,13 @@ func (x *LogId) GetLogId(isHyperLink bool) string {
 
 	if false && isHyperLink {
 		// return au.Col.Blue("xyz1").Hyperlink(fmt.Sprintf("foobarbas", x.Val)).HyperlinkTarget()
-
-		return au.Col.Hyperlink("foo", "https://foo.com").String()
-		return au.Col.Hyperlink("foo", "https://foo.com").HyperlinkTarget()
-		// return au.Col.Blue("(Goto -> LogId)").Hyperlink(fmt.Sprintf("http://vibeirl.com/dev/links?%s", x.Val)).HyperlinkTarget()
-	} else {
-		return fmt.Sprintf("(log-id:'%s')", x.Val)
-	}
+    return au.Col.Hyperlink("foo", "https://foo.com").String()
+    return au.Col.Hyperlink("foo", "https://foo.com").HyperlinkTarget()
+    // return au.Col.Blue("(Goto -> LogId)").Hyperlink(fmt.Sprintf("http://vibeirl.com/dev/links?%s", x.Val)).HyperlinkTarget()
+  } else {
+    //return fmt.Sprintf("(log-id:'%s')", x.Val)
+    return x.Val
+  }
 }
 
 func (x *LogId) IsLogId() bool {
