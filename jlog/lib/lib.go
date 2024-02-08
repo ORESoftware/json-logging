@@ -23,6 +23,7 @@ import (
   "strings"
   "sync"
   "time"
+  // "unsafe"
 )
 
 func writeToStderr(args ...interface{}) {
@@ -225,7 +226,7 @@ func (x *LogId) GetLogId(isHyperLink bool) string {
     return au.Col.Hyperlink("foo", "https://foo.com").HyperlinkTarget()
     // return au.Col.Blue("(Goto -> LogId)").Hyperlink(fmt.Sprintf("http://vibeirl.com/dev/links?%s", x.Val)).HyperlinkTarget()
   } else {
-    //return fmt.Sprintf("(log-id:'%s')", x.Val)
+    // return fmt.Sprintf("(log-id:'%s')", x.Val)
     return x.Val
   }
 }
@@ -631,11 +632,11 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
         return
       }
 
-      //fmt.Println("json-logging: cleaned:", cleaned)
+      // fmt.Println("json-logging: cleaned:", cleaned)
     }
 
     shared.M1.Lock()
-    //TODO: if the user selects stderr or non-stdout then need to lock on that
+    // TODO: if the user selects stderr or non-stdout then need to lock on that
     safeStdout.Write(buf)
     safeStdout.Write([]byte("\n"))
     shared.M1.Unlock()
@@ -788,7 +789,7 @@ func doMap(v interface{}, val reflect.Value) *MapVal {
     }
   }
 
-  //for i := 0; i < min; i++ {
+  // for i := 0; i < min; i++ {
   //  el := val.Index(i)
   //  if el.IsValid() {
   //    z.Val[i] = getInspectableVal(el.Interface(), el, 0, 1)
@@ -796,7 +797,7 @@ func doMap(v interface{}, val reflect.Value) *MapVal {
   //    // Handle the case where the value is nil
   //    z.Val[i] = nil // or any default value you want
   //  }
-  //}
+  // }
 
   return &z
 }
@@ -932,9 +933,9 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
     return x
   }
 
-  //if depth > 3 {
+  // if depth > 3 {
   //  return v
-  //}
+  // }
 
   if !rv.IsValid() {
     return nil
@@ -1101,7 +1102,22 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
       continue
     }
 
-    innerResult[fieldName] = fmt.Sprintf("xxx %v (Type: %s)", field.String(), field.Type().String())
+    // innerResult[fieldName] = fmt.Sprintf("%v (Type: %s)", field.String(), field.Type().String())
+    // continue
+
+    // f := rv.FieldByName(fieldName)
+
+    if field.CanAddr() {
+      //  field = reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
+      field = reflect.NewAt(field.Type(), field.Addr().UnsafePointer())
+    }
+
+    if field.IsValid() && field.CanInterface() {
+      innerResult[fieldName] = getInspectableVal(field.Interface(), field, depth+1, 1)
+    } else {
+      innerResult[fieldName] = fmt.Sprintf("%s", field.Type().String())
+    }
+
     continue
   }
 
@@ -1131,10 +1147,10 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
     } else if z, ok := x.(*LogId); ok {
       (*mf.m)["log_id"] = z.GetLogId(true)
       hasLogId = true
-      //newArgs = append(newArgs, z.GetLogId(true))
+      // newArgs = append(newArgs, z.GetLogId(true))
     } else if z, ok := x.(LogId); ok {
       (*mf.m)["log_id"] = z.GetLogId(true)
-      //newArgs = append(newArgs, z.GetLogId(true))
+      // newArgs = append(newArgs, z.GetLogId(true))
       hasLogId = true
     } else {
 
