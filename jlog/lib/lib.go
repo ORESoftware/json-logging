@@ -24,6 +24,7 @@ import (
   "sync"
   "time"
   // "unsafe"
+  "unsafe"
 )
 
 func writeToStderr(args ...interface{}) {
@@ -759,6 +760,8 @@ func doMap(v interface{}, val reflect.Value) *MapVal {
   keyToRetrieve := "JLogMarker"
 
   // Get the value associated with the key
+  // TODO: ??
+  // panic: reflect.Value.MapIndex: value of type string is not assignable to type http.connectMethodKey
   keyValue := val.MapIndex(reflect.ValueOf(keyToRetrieve))
 
   // Check if the key exists
@@ -916,6 +919,12 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
     }
 
   }
+
+  if !rv.CanInterface() {
+    return v;
+  }
+
+  v = rv.Interface()
 
   if v == nil {
     return nil
@@ -1102,14 +1111,14 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
       continue
     }
 
-    // innerResult[fieldName] = fmt.Sprintf("%v (Type: %s)", field.String(), field.Type().String())
-    // continue
+    innerResult[fieldName] = fmt.Sprintf("%v (Type: %s)", field.String(), field.Type().String())
+    continue
 
     // f := rv.FieldByName(fieldName)
 
     if field.CanAddr() {
-      //  field = reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
-      field = reflect.NewAt(field.Type(), field.Addr().UnsafePointer())
+       field = reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
+      //field = reflect.NewAt(field.Type(), field.Addr().UnsafePointer())
     }
 
     if field.IsValid() && field.CanInterface() {
