@@ -138,7 +138,7 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
     if val.CanInterface() {
       z.WriteString(fmt.Sprintf("'%s'", Cyan(fmt.Sprintf("%s", k.Interface())).String()))
       z.WriteString(Bold(" —> ").String())
-      z.WriteString(fmt.Sprintf("%T %+v %+v %v", ptr, val, m, val.String()))
+      z.WriteString(fmt.Sprintf("%+v <%T>", m, m))
       //z.WriteString(fmt.Sprintf(" 222 %v -- %v -- %v", rv, val.String(), val.Interface()))
       z.WriteString(addComma(i, n))
     } else {

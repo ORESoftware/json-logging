@@ -25,6 +25,7 @@ import (
   "time"
   // "unsafe"
   "unsafe"
+  "github.com/logrusorgru/aurora/v4"
 )
 
 func writeToStderr(args ...interface{}) {
@@ -399,6 +400,20 @@ type SprintFStruct struct {
   SprintF string
 }
 
+func getLastXChars(count int, s interface{}) string {
+  // Check if the string length is less than 13
+
+  if s, ok := s.(string); ok {
+    if len(s) < count {
+      return s // Return the original string if it's too short
+    }
+    // Return the last 13 characters
+    return s[len(s)-count:]
+  }
+
+  return "<(not a string)>"
+}
+
 func (l *Logger) Create(m *map[string]interface{}) *Logger {
   return l.Child(m)
 }
@@ -457,7 +472,8 @@ func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaField
   b.WriteString(au.Col.Italic(l.AppName).String())
   b.WriteString(" ")
   if v, ok := (*m.m)["log_id"]; ok {
-    b.WriteString(fmt.Sprintf("(log-id:%s) ", v))
+    //b.WriteString(fmt.Sprintf("(log-id:%s) ", v))
+    b.WriteString(fmt.Sprintf("(%s%s) ", aurora.Bold("log-id:").String(), getLastXChars(12, v)))
   }
 
   size := 0
