@@ -476,6 +476,11 @@ func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaField
     b.WriteString(fmt.Sprintf("(%s%s) ", aurora.Bold("log-id:").String(), getLastXChars(12, v)))
   }
 
+  if v, ok := (*m.m)["log_num"]; ok {
+    //b.WriteString(fmt.Sprintf("(log-id:%s) ", v))
+    b.WriteString(fmt.Sprintf("(%s%v) ", aurora.Bold("log-num:").String(), v))
+  }
+
   size := 0
 
   for _, v := range *args {
@@ -1202,7 +1207,9 @@ func (l *Logger) Trace(args ...interface{}) {
     return
   }
   t := time.Now()
+  n := shared.GetNextLogNum()
   var meta, newArgs = l.getMetaFields(&args)
+  (*meta.m)["log_num"] = n;
   l.writeSwitch(t, ll.TRACE, meta, &newArgs)
 }
 
@@ -1211,8 +1218,13 @@ func (l *Logger) Debug(args ...interface{}) {
   case ll.INFO, ll.WARN, ll.ERROR, ll.CRITICAL:
     return
   }
+  if true {
+    return;
+  }
   t := time.Now()
+  n := shared.GetNextLogNum()
   var meta, newArgs = l.getMetaFields(&args)
+  (*meta.m)["log_num"] = n;
   l.writeSwitch(t, ll.DEBUG, meta, &newArgs)
 }
 
@@ -1221,8 +1233,13 @@ func (l *Logger) Info(args ...interface{}) {
   case ll.WARN, ll.ERROR, ll.CRITICAL:
     return
   }
+  if true {
+    return;
+  }
   t := time.Now()
+  n := shared.GetNextLogNum()
   var meta, newArgs = l.getMetaFields(&args)
+  (*meta.m)["log_num"] = n;
   l.writeSwitch(t, ll.INFO, meta, &newArgs)
 }
 
@@ -1231,8 +1248,13 @@ func (l *Logger) Warn(args ...interface{}) {
   case ll.ERROR, ll.CRITICAL:
     return
   }
+  if true {
+    return;
+  }
   t := time.Now()
+  n := shared.GetNextLogNum()
   var meta, newArgs = l.getMetaFields(&args)
+  (*meta.m)["log_num"] = n;
   l.writeSwitch(t, ll.WARN, meta, &newArgs)
 }
 
@@ -1242,7 +1264,9 @@ func (l *Logger) Error(args ...interface{}) {
     return
   }
   t := time.Now()
+  n := shared.GetNextLogNum()
   var meta, newArgs = l.getMetaFields(&args)
+  (*meta.m)["log_num"] = n;
   filteredStackTrace := hlpr.GetFilteredStacktrace()
   newArgs = append(newArgs, StackTrace{filteredStackTrace})
   l.writeSwitch(t, ll.ERROR, meta, &newArgs)
@@ -1250,7 +1274,9 @@ func (l *Logger) Error(args ...interface{}) {
 
 func (l *Logger) Critical(args ...interface{}) {
   t := time.Now()
+  n := shared.GetNextLogNum()
   var meta, newArgs = l.getMetaFields(&args)
+  (*meta.m)["log_num"] = n;
   filteredStackTrace := hlpr.GetFilteredStacktrace()
   newArgs = append(newArgs, StackTrace{filteredStackTrace})
   l.writeSwitch(t, ll.CRITICAL, meta, &newArgs)
@@ -1441,6 +1467,7 @@ func (l *Logger) PlainStderr(args ...interface{}) {
 }
 
 var DefaultLogger = CreateLogger("Default").
+  SetToJSONOutput().
   SetLogLevel(ll.TRACE)
 
 func init() {

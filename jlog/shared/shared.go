@@ -26,6 +26,17 @@ var Level = map[string]ll.LogLevel{
   "":         ll.INFO,
 }
 
+var logNumberPerProcess = 0
+
+var s sync.Mutex = sync.Mutex{}
+
+func GetNextLogNum() int {
+  s.Lock()
+  defer s.Unlock()
+  logNumberPerProcess++
+  return logNumberPerProcess
+}
+
 func ToLogLevel(s string) ll.LogLevel {
   var cleanVal = strings.ToUpper(strings.TrimSpace(s))
   if v, ok := Level[cleanVal]; ok {
