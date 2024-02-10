@@ -1218,9 +1218,6 @@ func (l *Logger) Debug(args ...interface{}) {
   case ll.INFO, ll.WARN, ll.ERROR, ll.CRITICAL:
     return
   }
-  if true {
-    return;
-  }
   t := time.Now()
   n := shared.GetNextLogNum()
   var meta, newArgs = l.getMetaFields(&args)
@@ -1233,9 +1230,6 @@ func (l *Logger) Info(args ...interface{}) {
   case ll.WARN, ll.ERROR, ll.CRITICAL:
     return
   }
-  if true {
-    return;
-  }
   t := time.Now()
   n := shared.GetNextLogNum()
   var meta, newArgs = l.getMetaFields(&args)
@@ -1247,9 +1241,6 @@ func (l *Logger) Warn(args ...interface{}) {
   switch l.LogLevel {
   case ll.ERROR, ll.CRITICAL:
     return
-  }
-  if true {
-    return;
   }
   t := time.Now()
   n := shared.GetNextLogNum()
