@@ -29,7 +29,7 @@ import (
   jsoniter "github.com/json-iterator/go"
 )
 
-
+// TODO: use a better json lib for encoding?
 var jsn = jsoniter.ConfigCompatibleWithStandardLibrary
 
 func writeToStderr(args ...interface{}) {
@@ -67,8 +67,10 @@ var safeStderr = writer.NewSafeWriter(os.Stderr)
 var lockStack = stack.NewStack()
 
 type Logger struct {
+  Mtx           sync.Mutex
   AppName       string
   IsLoggingJSON bool
+  HighPerf      bool
   HostName      string
   ForceJSON     bool
   ForceNonJSON  bool
@@ -162,6 +164,7 @@ func NewLogger(p LoggerParams) *Logger {
   }
 
   return &Logger{
+    Mtx:           sync.Mutex{},
     AppName:       appName,
     IsLoggingJSON: isLoggingJson,
     HostName:      hostName,
@@ -260,6 +263,7 @@ func (l *Logger) NewLoggerWithLock() (*Logger, func()) {
     Lck: newLck,
   })
   var z = Logger{
+    Mtx:           sync.Mutex{},
     AppName:       l.AppName,
     IsLoggingJSON: l.IsLoggingJSON,
     HostName:      l.HostName,
@@ -272,7 +276,17 @@ func (l *Logger) NewLoggerWithLock() (*Logger, func()) {
   return &z, z.unlock
 }
 
+func (l *Logger) SetHighPerf(b bool) *Logger {
+  l.Mtx.Lock()
+  defer l.Mtx.Unlock()
+  l.HighPerf = b
+  return l
+}
+
 func (l *Logger) SetEnvPrefix(s string) *Logger {
+  l.Mtx.Lock()
+  defer l.Mtx.Unlock()
+
   l.EnvPrefix = s
 
   if len(l.EnvPrefix) > 0 {
@@ -292,54 +306,74 @@ func (l *Logger) SetEnvPrefix(s string) *Logger {
 
 func (l *Logger) SetToDisplayUTC() *Logger {
   // TODO: use lock to set this
+  l.Mtx.Lock()
+  defer l.Mtx.Unlock()
   l.IsShowLocalTZ = false
   return l
 }
 
 func (l *Logger) SetToUseTZ() *Logger {
   // TODO: use lock to set this
+  l.Mtx.Lock()
+  defer l.Mtx.Unlock()
   l.IsShowLocalTZ = false
   return l
 }
 
 func (l *Logger) SetToDisplayLocalTZ() *Logger {
   // TODO: use lock to set this
+  l.Mtx.Lock()
+  defer l.Mtx.Unlock()
   l.IsShowLocalTZ = true
   return l
 }
 
 func (l *Logger) SetOutputFile(f *os.File) *Logger {
   // TODO: use lock to set this
+  l.Mtx.Lock()
+  defer l.Mtx.Unlock()
   l.File = f
   return l
 }
 
 func (l *Logger) SetLogLevel(f ll.LogLevel) *Logger {
+  l.Mtx.Lock()
+  defer l.Mtx.Unlock()
   l.LogLevel = f
   return l
 }
 
 func (l *Logger) AddMetaField(s string, v interface{}) *Logger {
+  l.Mtx.Lock()
+  defer l.Mtx.Unlock()
   (*l.MetaFields.m)[s] = v
   return l
 }
 
 func (l *Logger) SetToJSONOutput() *Logger {
+  l.Mtx.Lock()
+  defer l.Mtx.Unlock()
   l.IsLoggingJSON = true
   return l
 }
 
 func (l *Logger) SetAppName(h string) *Logger {
+  l.Mtx.Lock()
+  defer l.Mtx.Unlock()
   l.AppName = h
   return l
 }
 
 func (l *Logger) SetTimeZone(h time.Location) *Logger {
+  l.Mtx.Lock()
+  defer l.Mtx.Unlock()
   l.TimeZone = &h
   return l
 }
 
 func (l *Logger) SetHostName(h string) *Logger {
+  l.Mtx.Lock()
+  defer l.Mtx.Unlock()
   l.HostName = h
   return l
 }
@@ -377,6 +411,9 @@ func (l *Logger) unlock() {
 
 func (l *Logger) Child(m *map[string]interface{}) *Logger {
 
+  l.Mtx.Lock()
+  defer l.Mtx.Unlock()
+
   var z = make(map[string]interface{})
   for k, v := range *l.MetaFields.m {
     z[k] = hlpr.CopyAndDereference(v)
@@ -387,6 +424,7 @@ func (l *Logger) Child(m *map[string]interface{}) *Logger {
   }
 
   return &Logger{
+    Mtx:           sync.Mutex{},
     AppName:       l.AppName,
     IsLoggingJSON: l.IsLoggingJSON,
     HostName:      l.HostName,
@@ -946,7 +984,7 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
   }
 
   if !rv.CanInterface() {
-    return v;
+    return v
   }
 
   v = rv.Interface()
@@ -1142,7 +1180,7 @@ func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) 
     // f := rv.FieldByName(fieldName)
 
     if field.CanAddr() {
-       field = reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
+      field = reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
       //field = reflect.NewAt(field.Type(), field.Addr().UnsafePointer())
     }
 
@@ -1188,7 +1226,7 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
       hasLogId = true
     } else {
 
-      if l.IsLoggingJSON {
+      if l.IsLoggingJSON && !l.HighPerf {
         var xx = reflect.ValueOf(x)
         newArgs = append(newArgs, getInspectableVal(x, xx, 0, 1))
       } else {
@@ -1213,7 +1251,7 @@ func (l *Logger) Trace(args ...interface{}) {
   t := time.Now()
   n := shared.GetNextLogNum()
   var meta, newArgs = l.getMetaFields(&args)
-  (*meta.m)["log_num"] = n;
+  (*meta.m)["log_num"] = n
   l.writeSwitch(t, ll.TRACE, meta, &newArgs)
 }
 
@@ -1225,7 +1263,7 @@ func (l *Logger) Debug(args ...interface{}) {
   t := time.Now()
   n := shared.GetNextLogNum()
   var meta, newArgs = l.getMetaFields(&args)
-  (*meta.m)["log_num"] = n;
+  (*meta.m)["log_num"] = n
   l.writeSwitch(t, ll.DEBUG, meta, &newArgs)
 }
 
@@ -1237,7 +1275,7 @@ func (l *Logger) Info(args ...interface{}) {
   t := time.Now()
   n := shared.GetNextLogNum()
   var meta, newArgs = l.getMetaFields(&args)
-  (*meta.m)["log_num"] = n;
+  (*meta.m)["log_num"] = n
   l.writeSwitch(t, ll.INFO, meta, &newArgs)
 }
 
@@ -1249,7 +1287,7 @@ func (l *Logger) Warn(args ...interface{}) {
   t := time.Now()
   n := shared.GetNextLogNum()
   var meta, newArgs = l.getMetaFields(&args)
-  (*meta.m)["log_num"] = n;
+  (*meta.m)["log_num"] = n
   l.writeSwitch(t, ll.WARN, meta, &newArgs)
 }
 
@@ -1261,7 +1299,7 @@ func (l *Logger) Error(args ...interface{}) {
   t := time.Now()
   n := shared.GetNextLogNum()
   var meta, newArgs = l.getMetaFields(&args)
-  (*meta.m)["log_num"] = n;
+  (*meta.m)["log_num"] = n
   filteredStackTrace := hlpr.GetFilteredStacktrace()
   newArgs = append(newArgs, StackTrace{filteredStackTrace})
   l.writeSwitch(t, ll.ERROR, meta, &newArgs)
@@ -1271,7 +1309,7 @@ func (l *Logger) Critical(args ...interface{}) {
   t := time.Now()
   n := shared.GetNextLogNum()
   var meta, newArgs = l.getMetaFields(&args)
-  (*meta.m)["log_num"] = n;
+  (*meta.m)["log_num"] = n
   filteredStackTrace := hlpr.GetFilteredStacktrace()
   newArgs = append(newArgs, StackTrace{filteredStackTrace})
   l.writeSwitch(t, ll.CRITICAL, meta, &newArgs)
