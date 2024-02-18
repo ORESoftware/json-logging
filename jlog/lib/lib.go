@@ -26,7 +26,11 @@ import (
   // "unsafe"
   "unsafe"
   "github.com/logrusorgru/aurora/v4"
+  jsoniter "github.com/json-iterator/go"
 )
+
+
+var jsn = jsoniter.ConfigCompatibleWithStandardLibrary
 
 func writeToStderr(args ...interface{}) {
   safeStderr.Lock()
@@ -627,7 +631,7 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
     defer wg.Done()
 
     // TODO: maybe manually generating JSON is better? prob not worth it
-    buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, mf.m, args})
+    buf, err := jsn.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, mf.m, args})
 
     if err != nil {
 
