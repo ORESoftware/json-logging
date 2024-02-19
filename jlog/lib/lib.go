@@ -1226,7 +1226,7 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
       hasLogId = true
     } else {
 
-      if l.IsLoggingJSON && !l.HighPerf {
+      if l.IsLoggingJSON && true || !l.HighPerf {
         var xx = reflect.ValueOf(x)
         newArgs = append(newArgs, getInspectableVal(x, xx, 0, 1))
       } else {
