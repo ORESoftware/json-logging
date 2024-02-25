@@ -27,6 +27,8 @@ import (
   "unsafe"
   "github.com/logrusorgru/aurora/v4"
   //jsoniter "github.com/json-iterator/go"
+  "github.com/mailru/easyjson"
+  "bytes"
 )
 
 // TODO: use a better json lib for encoding?
@@ -637,6 +639,39 @@ func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaField
   return &b
 }
 
+func marshalCustomArray(arr []interface{}) ([]byte, error) {
+  var b bytes.Buffer
+  b.WriteByte('[')
+
+  for i, v := range arr {
+    var buf []byte
+    var err error
+
+    // Check if the value implements easyjson.Marshaler
+    if m, ok := v.(easyjson.Marshaler); ok {
+      buf, err = easyjson.Marshal(m)
+    } else {
+      // Fallback to encoding/json
+      buf, err = json.Marshal(v)
+    }
+
+    if err != nil {
+      return nil, err
+    }
+
+    b.Write(buf)
+
+    // Add comma between elements, but not after the last element
+    if i < len(arr)-1 {
+      b.WriteByte(',')
+    }
+  }
+
+  b.WriteByte(']')
+
+  return b.Bytes(), nil
+}
+
 func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, args *[]interface{}) {
 
   date := time.UTC().String()
@@ -668,8 +703,15 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
 
     defer wg.Done()
 
-    // TODO: maybe manually generating JSON is better? prob not worth it∑
-    buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, mf.m, args})
+    // TODO: maybe manually generating JSON is better? prob not worth it
+    //buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, mf.m, args})
+
+    jj, err := json.Marshal(mf.m)
+
+    jjj, err := marshalCustomArray(*args)
+
+    buf := []byte(fmt.Sprintf(`["@bunion:v1","%s","%s","%d","%s","%s", %s, %s]`,
+      l.AppName, strLevel, pid, l.HostName, date, string(jj), string(jjj)))
 
     if err != nil {
 

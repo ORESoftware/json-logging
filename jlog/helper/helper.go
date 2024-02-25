@@ -512,7 +512,10 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
   }
 
   if kind == reflect.Chan {
-    return fmt.Sprintf("(chan (%s) %v)", rv.Type().Elem().String(), rv.Elem().Interface())
+    if rv.CanInterface() {
+      return fmt.Sprintf("(chan (%s) %v)", rv.Type().Elem().String(), rv.Interface())
+    }
+    return fmt.Sprintf("(chan (%s) %v)", rv.Type().Elem().String())
   }
 
   if kind == reflect.Map {
