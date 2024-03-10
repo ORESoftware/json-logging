@@ -639,8 +639,82 @@ func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaField
   return &b
 }
 
-func marshalCustomArray(arr []interface{}) ([]byte, error) {
+func marshalCustomArray2(arr []interface{}) ([]byte, error) {
   var b bytes.Buffer
+  b.WriteByte('[')
+
+  for i, v := range arr {
+    var buf []byte
+    var err error
+
+    // Check if the value implements easyjson.Marshaler
+    if m, ok := v.(easyjson.Marshaler); ok {
+      buf, err = easyjson.Marshal(m)
+      fmt.Println(fmt.Sprintf(`["20095e96-d393-456a-9a9a-3e0c47ce760c","%s"]`, err.Error()));
+    } else {
+      // Fallback to encoding/json
+      buf, err = json.Marshal(v)
+    }
+
+    if err != nil {
+      return nil, err
+    }
+
+    b.Write(buf)
+
+    // Add comma between elements, but not after the last element
+    if i < len(arr)-1 {
+      b.WriteByte(',')
+    }
+  }
+
+  b.WriteByte(']')
+
+  return b.Bytes(), nil
+}
+
+var bufferPool = sync.Pool{
+  New: func() interface{} {
+    return new(bytes.Buffer)
+  },
+}
+
+var bufferPool2 = sync.Pool{
+  New: func() interface{} {
+    return new(bytes.Buffer)
+  },
+}
+
+var bufferPool3 = sync.Pool{
+  New: func() interface{} {
+    return new(bytes.Buffer)
+  },
+}
+
+func marshalToJSON(v interface{}) ([]byte, error) {
+  buf := bufferPool.Get().(*bytes.Buffer)
+  buf.Reset()
+  defer bufferPool.Put(buf)
+
+  encoder := json.NewEncoder(buf)
+  if err := encoder.Encode(v); err != nil {
+    return nil, err
+  }
+
+  // Need to remove the trailing newline added by Encode
+  if buf.Len() > 0 {
+    buf.Truncate(buf.Len() - 1)
+  }
+
+  return buf.Bytes(), nil
+}
+
+func marshalCustomArray(arr []interface{}) ([]byte, error) {
+  ///
+  b := bufferPool.Get().(*bytes.Buffer)
+  b.Reset() // Reset the buffer for reuse
+  defer bufferPool.Put(b)
+
   b.WriteByte('[')
 
   for i, v := range arr {
@@ -669,7 +743,7 @@ func marshalCustomArray(arr []interface{}) ([]byte, error) {
 
   b.WriteByte(']')
 
-  return b.Bytes(), nil
+  return b.Bytes(), nil // Convert buffer to bytes and return
 }
 
 func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, args *[]interface{}) {
@@ -692,8 +766,9 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
     mf = NewMetaFields(&MF{})
   }
 
-  // shared.StdioPool.Run(func(g *sync.WaitGroup) {
+  //shared.StdioPool.Run(func(g *sync.WaitGroup) {
 
+  // TODO: use a single channel for all calls, instead of different waitgroups per call?
   var wg = sync.WaitGroup{}
   wg.Add(1)
 
@@ -713,6 +788,36 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
     buf := []byte(fmt.Sprintf(`["@bunion:v1","%s","%s","%d","%s","%s", %s, %s]`,
       l.AppName, strLevel, pid, l.HostName, date, string(jj), string(jjj)))
 
+    if false {
+      _ = func() []byte {
+        buf := bufferPool3.Get().(*bytes.Buffer)
+        buf.Reset()                // Reset the buffer for reuse
+        defer bufferPool3.Put(buf) // Make sure to return the buffer to the pool
+
+        // Use the buffer to construct the string
+        buf.WriteString(`["@bunion:v1","`)
+        buf.WriteString(l.AppName)
+        buf.WriteString(`","`)
+        buf.WriteString(strLevel)
+        buf.WriteString(`",`)
+        buf.WriteString(fmt.Sprint(pid))
+        buf.WriteString(`,"`)
+        buf.WriteString(l.HostName)
+        buf.WriteString(`","`)
+        buf.WriteString(date)
+        buf.WriteString(`", `)
+        buf.Write(jj) // Assuming jj is already a []byte representing JSON
+        buf.WriteString(", ")
+        buf.Write(jjj) // Assuming jjj is also a []byte representing JSON
+        buf.WriteString("]")
+
+        // Convert the buffer's contents to a []byte if needed
+        result := buf.Bytes()
+
+        return result
+      }()
+    }
+
     if err != nil {
 
       _, file, line, _ := runtime.Caller(3)
@@ -721,7 +826,7 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
       // cleaned := make([]interface{},0)
 
       var cache = map[*interface{}]*interface{}{}
-      var cleaned = make([]interface{}, 0)
+      var cleaned = make([]interface{}, 0, len(*args))
 
       for i := 0; i < len(*args); i++ {
         // TODO: for now instead of cleanUp, we can ust fmt.Sprintf()
