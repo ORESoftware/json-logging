@@ -746,6 +746,17 @@ func marshalCustomArray(arr []interface{}) ([]byte, error) {
   return b.Bytes(), nil // Convert buffer to bytes and return
 }
 
+var ioChan = make(chan func())
+
+func init(){
+  go func() {
+    for {
+      fn := <- ioChan
+      fn()
+    }
+  }()
+}
+
 func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, args *[]interface{}) {
 
   date := time.UTC().String()
@@ -774,7 +785,7 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
 
   // shared.StdioPool.Run(func(g *sync.WaitGroup) {
 
-  go func() {
+  ioChan <- (func() {
 
     defer wg.Done()
 
@@ -851,7 +862,7 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
     safeStdout.Write(buf)
     safeStdout.Write([]byte("\n"))
     shared.M1.Unlock()
-  }()
+  });
 
   wg.Wait()
 
