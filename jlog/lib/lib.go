@@ -747,6 +747,7 @@ func marshalCustomArray(arr []interface{}) ([]byte, error) {
 }
 
 var ioChan = make(chan func())
+var ioChan2 = make(chan func())
 
 func init(){
   go func() {
@@ -755,6 +756,14 @@ func init(){
       fn()
     }
   }()
+
+  go func() {
+    for {
+      fn := <- ioChan2
+      fn()
+    }
+  }()
+
 }
 
 func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, args *[]interface{}) {
@@ -780,14 +789,14 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
   //shared.StdioPool.Run(func(g *sync.WaitGroup) {
 
   // TODO: use a single channel for all calls, instead of different waitgroups per call?
-  var wg = sync.WaitGroup{}
-  wg.Add(1)
+  //var wg = sync.WaitGroup{}
+  //wg.Add(1)
 
   // shared.StdioPool.Run(func(g *sync.WaitGroup) {
 
   ioChan <- (func() {
 
-    defer wg.Done()
+    //defer wg.Done()
 
     // TODO: maybe manually generating JSON is better? prob not worth it
     //buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, mf.m, args})
@@ -857,15 +866,17 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
       // fmt.Println("json-logging: cleaned:", cleaned)
     }
 
-    shared.M1.Lock()
-    // TODO: if the user selects stderr or non-stdout then need to lock on that
-    safeStdout.Write(buf)
-    safeStdout.Write([]byte("\n"))
-    shared.M1.Unlock()
+    ioChan2 <- func() {
+      shared.M1.Lock()
+      // TODO: if the user selects stderr or non-stdout then need to lock on that
+      safeStdout.Write(buf)
+      safeStdout.Write([]byte("\n"))
+      shared.M1.Unlock()
+    }
+
   });
 
-  wg.Wait()
-
+  //wg.Wait()
 }
 
 func (l *Logger) writeSwitch(time time.Time, level ll.LogLevel, m *MetaFields, args *[]interface{}) {
