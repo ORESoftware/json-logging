@@ -31,3 +31,5 @@ In Go, `json.Marshal` returns an error in a few specific scenarios where the dat
 It's important to note that `json.Marshal` does not return an error for marshaling private (unexported) struct fields. Instead, it silently ignores them. To include private fields in the JSON output, you either need to export these fields (make their first letter uppercase) or provide a custom marshaling method.
 
 Understanding these conditions can help in ensuring that the data structures used with `json.Marshal` are compatible with JSON's serialization requirements.
+
+Add a todo here.
