@@ -35,11 +35,9 @@ import (
 //var jsn = jsoniter.ConfigCompatibleWithStandardLibrary
 
 func writeToStderr(args ...interface{}) {
-  safeStderr.Lock()
-  if _, err := fmt.Fprintln(os.Stderr, args...); err != nil {
+  if _, err := safeStderr.Write([]byte(fmt.Sprintln(args...))); err != nil {
     fmt.Println("adcca45f-8d7b-4d4a-8fd2-7683b7b375b5", "could not write to stderr:", err)
   }
-  safeStderr.Unlock()
 }
 
 func isBase64Perf(s string) bool {
@@ -69,7 +67,7 @@ var safeStderr = writer.NewSafeWriter(os.Stderr)
 var lockStack = stack.NewStack()
 
 type Logger struct {
-  Mtx           sync.Mutex
+  Mtx           sync.RWMutex
   AppName       string
   IsLoggingJSON bool
   HighPerf      bool
@@ -166,7 +164,7 @@ func NewLogger(p LoggerParams) *Logger {
   }
 
   return &Logger{
-    Mtx:           sync.Mutex{},
+    Mtx:           sync.RWMutex{},
     AppName:       appName,
     IsLoggingJSON: isLoggingJson,
     HostName:      hostName,
@@ -254,27 +252,104 @@ func (l *Logger) Id(v string) *LogId {
   return Id(v)
 }
 
+func levelEnabled(minLevel ll.LogLevel, level ll.LogLevel) bool {
+  return level >= minLevel
+}
+
+func V(level ll.LogLevel) bool {
+  return DefaultLogger.V(level)
+}
+
+func IsLevelEnabled(level ll.LogLevel) bool {
+  return DefaultLogger.IsLevelEnabled(level)
+}
+
+func (l *Logger) V(level ll.LogLevel) bool {
+  return l.IsLevelEnabled(level)
+}
+
+func (l *Logger) IsLevelEnabled(level ll.LogLevel) bool {
+  l.Mtx.RLock()
+  defer l.Mtx.RUnlock()
+  return levelEnabled(l.LogLevel, level)
+}
+
+func (l *Logger) IsTraceEnabled() bool {
+  return l.IsLevelEnabled(ll.TRACE)
+}
+
+func (l *Logger) IsDebugEnabled() bool {
+  return l.IsLevelEnabled(ll.DEBUG)
+}
+
+func (l *Logger) IsInfoEnabled() bool {
+  return l.IsLevelEnabled(ll.INFO)
+}
+
+func (l *Logger) IsWarnEnabled() bool {
+  return l.IsLevelEnabled(ll.WARN)
+}
+
+func (l *Logger) IsErrorEnabled() bool {
+  return l.IsLevelEnabled(ll.ERROR)
+}
+
+func (l *Logger) IsCriticalEnabled() bool {
+  return l.IsLevelEnabled(ll.CRITICAL)
+}
+
+func (l *Logger) outputFile() *os.File {
+  l.Mtx.RLock()
+  defer l.Mtx.RUnlock()
+  if l.File == nil {
+    return os.Stdout
+  }
+  return l.File
+}
+
+func (l *Logger) writeOutput(f *os.File, b []byte) {
+  if f == nil {
+    f = os.Stdout
+  }
+
+  l.Mtx.RLock()
+  isLockedLogger := l.LockUuid != ""
+  l.Mtx.RUnlock()
+
+  if !isLockedLogger {
+    shared.M1.RLock()
+    defer shared.M1.RUnlock()
+  }
+
+  if _, err := writer.Write(f, b); err != nil {
+    writeToStderr("json-logging: could not write log output:", err)
+  }
+}
+
 func (l *Logger) NewLoggerWithLock() (*Logger, func()) {
   shared.M1.Lock()
-  defer shared.M1.Unlock()
-  var newLck = &sync.Mutex{}
-  newLck.Lock()
   var id = uuid.New().String()
   lockStack.Push(&stack.StackItem{
-    Id:  id,
-    Lck: newLck,
+    Id: id,
   })
+  l.Mtx.RLock()
   var z = Logger{
-    Mtx:           sync.Mutex{},
+    Mtx:           sync.RWMutex{},
     AppName:       l.AppName,
     IsLoggingJSON: l.IsLoggingJSON,
+    HighPerf:      l.HighPerf,
     HostName:      l.HostName,
     ForceJSON:     l.ForceJSON,
     ForceNonJSON:  l.ForceNonJSON,
     TimeZone:      l.TimeZone,
     MetaFields:    l.MetaFields,
     LockUuid:      id,
+    EnvPrefix:     l.EnvPrefix,
+    LogLevel:      l.LogLevel,
+    File:          l.File,
+    IsShowLocalTZ: l.IsShowLocalTZ,
   }
+  l.Mtx.RUnlock()
   return &z, z.unlock
 }
 
@@ -381,15 +456,10 @@ func (l *Logger) SetHostName(h string) *Logger {
 }
 
 func (l *Logger) unlock() {
-
-  shared.M1.Lock()
-  defer shared.M1.Unlock()
-
   var peek, err = lockStack.Peek()
 
   if peek == nil {
     panic("error with lib - peek should not be nil")
-    return
   }
 
   if err != nil {
@@ -400,21 +470,20 @@ func (l *Logger) unlock() {
     panic("lock ids do not match")
   }
 
-  lockStack.Print("123")
   x, err := lockStack.Pop()
   if x != peek {
     panic("must equal peek")
   }
-  fmt.Println("unlocking:", peek.Id)
-  lockStack.Print("456")
-  peek.Lck.Unlock()
-
+  if err != nil {
+    panic(err)
+  }
+  shared.M1.Unlock()
 }
 
 func (l *Logger) Child(m *map[string]interface{}) *Logger {
 
-  l.Mtx.Lock()
-  defer l.Mtx.Unlock()
+  l.Mtx.RLock()
+  defer l.Mtx.RUnlock()
 
   var z = make(map[string]interface{})
   for k, v := range *l.MetaFields.m {
@@ -426,9 +495,10 @@ func (l *Logger) Child(m *map[string]interface{}) *Logger {
   }
 
   return &Logger{
-    Mtx:           sync.Mutex{},
+    Mtx:           sync.RWMutex{},
     AppName:       l.AppName,
     IsLoggingJSON: l.IsLoggingJSON,
+    HighPerf:      l.HighPerf,
     HostName:      l.HostName,
     ForceJSON:     l.ForceJSON,
     ForceNonJSON:  l.ForceNonJSON,
@@ -437,6 +507,8 @@ func (l *Logger) Child(m *map[string]interface{}) *Logger {
     LockUuid:      l.LockUuid,
     EnvPrefix:     l.EnvPrefix,
     LogLevel:      l.LogLevel,
+    File:          l.File,
+    IsShowLocalTZ: l.IsShowLocalTZ,
   }
 }
 
@@ -462,24 +534,28 @@ func (l *Logger) Create(m *map[string]interface{}) *Logger {
   return l.Child(m)
 }
 
-func (l *Logger) writeToFile(time time.Time, level ll.LogLevel, m *MetaFields, args *[]interface{}) {
-  b := l.getPrettyString(time, level, m, args)
-  shared.M1.Lock()
-  l.File.WriteString(b.String())
-  shared.M1.Unlock()
+func (l *Logger) writeToFile(ts time.Time, level ll.LogLevel, m *MetaFields, args *[]interface{}) {
+  b := l.getPrettyString(ts, level, m, args)
+  l.writeOutput(l.outputFile(), []byte(b.String()))
   // _, err := io.Copy(l.File, b.)  // TODO: copy to file, instead of buffering b.String()
 }
 
-func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaFields, args *[]interface{}) *strings.Builder {
+func (l *Logger) getPrettyString(ts time.Time, level ll.LogLevel, m *MetaFields, args *[]interface{}) *strings.Builder {
+
+  l.Mtx.RLock()
+  appName := l.AppName
+  isShowLocalTZ := l.IsShowLocalTZ
+  timeZone := l.TimeZone
+  l.Mtx.RUnlock()
 
   var b strings.Builder
-  date := time.UTC().String()[11:25] // only first 25 chars
+  date := ts.UTC().String()[11:25] // only first 25 chars
 
-  if l.IsShowLocalTZ {
-    if l.TimeZone != nil {
-      date = time.UTC().In(l.TimeZone).String()[11:25]
+  if isShowLocalTZ {
+    if timeZone != nil {
+      date = ts.UTC().In(timeZone).String()[11:25]
     } else {
-      date = time.Local().String()[11:25] // only first 25 chars
+      date = ts.Local().String()[11:25] // only first 25 chars
     }
   }
 
@@ -513,7 +589,7 @@ func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaField
   b.WriteString(stylizedLevel)
   b.WriteString(" ")
   b.WriteString(au.Col.Gray(12, "app:").String())
-  b.WriteString(au.Col.Italic(l.AppName).String())
+  b.WriteString(au.Col.Italic(appName).String())
   b.WriteString(" ")
   if v, ok := (*m.m)["log_id"]; ok {
     //b.WriteString(fmt.Sprintf("(log-id:%s) ", v))
@@ -558,8 +634,8 @@ func (l *Logger) getPrettyString(time time.Time, level ll.LogLevel, m *MetaField
         break
       }
 
-      if !rv.IsNil() {
-        b.WriteString(fmt.Sprintf("%v", v))
+      if rv.IsNil() {
+        v = nil
         break
       }
 
@@ -766,15 +842,27 @@ func init(){
 
 }
 
-func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, args *[]interface{}) {
+func (l *Logger) writeJSON(ts time.Time, level ll.LogLevel, mf *MetaFields, args *[]interface{}) {
 
-  date := time.UTC().String()
+  l.Mtx.RLock()
+  appName := l.AppName
+  hostName := l.HostName
+  isShowLocalTZ := l.IsShowLocalTZ
+  timeZone := l.TimeZone
+  file := l.File
+  l.Mtx.RUnlock()
 
-  if l.IsShowLocalTZ {
-    if l.TimeZone != nil {
-      date = time.UTC().In(l.TimeZone).String()
+  if file == nil {
+    file = os.Stdout
+  }
+
+  date := ts.UTC().String()
+
+  if isShowLocalTZ {
+    if timeZone != nil {
+      date = ts.UTC().In(timeZone).String()
     } else {
-      date = time.Local().String() // only first 25 chars
+      date = ts.Local().String() // only first 25 chars
     }
   }
 
@@ -786,101 +874,40 @@ func (l *Logger) writeJSON(time time.Time, level ll.LogLevel, mf *MetaFields, ar
     mf = NewMetaFields(&MF{})
   }
 
-  //shared.StdioPool.Run(func(g *sync.WaitGroup) {
+  buf, err := json.Marshal([8]interface{}{"@bunion:v1", appName, strLevel, pid, hostName, date, mf.m, *args})
 
-  // TODO: use a single channel for all calls, instead of different waitgroups per call?
-  //var wg = sync.WaitGroup{}
-  //wg.Add(1)
+  if err != nil {
 
-  // shared.StdioPool.Run(func(g *sync.WaitGroup) {
+    _, callerFile, line, _ := runtime.Caller(3)
+    DefaultLogger.Warn("json-logging: 1: could not marshal the slice:", err.Error(), "file://"+callerFile+":"+strconv.Itoa(line))
 
-  ioChan <- (func() {
+    var cache = map[uintptr]interface{}{}
+    var cleaned = make([]interface{}, 0, len(*args))
 
-    //defer wg.Done()
-
-    // TODO: maybe manually generating JSON is better? prob not worth it
-    //buf, err := json.Marshal([8]interface{}{"@bunion:v1", l.AppName, strLevel, pid, l.HostName, date, mf.m, args})
-
-    jj, err := json.Marshal(mf.m)
-
-    jjj, err := marshalCustomArray(*args)
-
-    buf := []byte(fmt.Sprintf(`["@bunion:v1","%s","%s","%d","%s","%s", %s, %s]`,
-      l.AppName, strLevel, pid, l.HostName, date, string(jj), string(jjj)))
-
-    if false {
-      _ = func() []byte {
-        buf := bufferPool3.Get().(*bytes.Buffer)
-        buf.Reset()                // Reset the buffer for reuse
-        defer bufferPool3.Put(buf) // Make sure to return the buffer to the pool
-
-        // Use the buffer to construct the string
-        buf.WriteString(`["@bunion:v1","`)
-        buf.WriteString(l.AppName)
-        buf.WriteString(`","`)
-        buf.WriteString(strLevel)
-        buf.WriteString(`",`)
-        buf.WriteString(fmt.Sprint(pid))
-        buf.WriteString(`,"`)
-        buf.WriteString(l.HostName)
-        buf.WriteString(`","`)
-        buf.WriteString(date)
-        buf.WriteString(`", `)
-        buf.Write(jj) // Assuming jj is already a []byte representing JSON
-        buf.WriteString(", ")
-        buf.Write(jjj) // Assuming jjj is also a []byte representing JSON
-        buf.WriteString("]")
-
-        // Convert the buffer's contents to a []byte if needed
-        result := buf.Bytes()
-
-        return result
-      }()
+    for i := 0; i < len(*args); i++ {
+      v := &(*args)[i]
+      c := hlpr.CleanUp(v, &cache)
+      cleaned = append(cleaned, c)
     }
+
+    buf, err = json.Marshal([8]interface{}{"@bunion:v1", appName, strLevel, pid, hostName, date, mf.m, cleaned})
 
     if err != nil {
-
-      _, file, line, _ := runtime.Caller(3)
-      DefaultLogger.Warn("json-logging: 1: could not marshal the slice:", err.Error(), "file://"+file+":"+strconv.Itoa(line))
-
-      // cleaned := make([]interface{},0)
-
-      var cache = map[*interface{}]*interface{}{}
-      var cleaned = make([]interface{}, 0, len(*args))
-
-      for i := 0; i < len(*args); i++ {
-        // TODO: for now instead of cleanUp, we can ust fmt.Sprintf()
-        v := &(*args)[i]
-        c := hlpr.CleanUp(v, &cache)
-        // debug.PrintStack()
-        cleaned = append(cleaned, c)
-      }
-
-      buf, err = json.Marshal([8]interface{}{"@bunion:v1", l.AppName, level, pid, l.HostName, date, mf.m, cleaned})
-
-      if err != nil {
-        fmt.Println(errors.New("Json-Logging: 2: could not marshal the slice: " + err.Error()))
-        return
-      }
-
-      // fmt.Println("json-logging: cleaned:", cleaned)
+      writeToStderr(errors.New("Json-Logging: 2: could not marshal the slice: " + err.Error()))
+      return
     }
+  }
 
-    ioChan2 <- func() {
-      shared.M1.Lock()
-      // TODO: if the user selects stderr or non-stdout then need to lock on that
-      safeStdout.Write(buf)
-      safeStdout.Write([]byte("\n"))
-      shared.M1.Unlock()
-    }
-
-  });
-
-  //wg.Wait()
+  buf = append(buf, '\n')
+  l.writeOutput(file, buf)
 }
 
 func (l *Logger) writeSwitch(time time.Time, level ll.LogLevel, m *MetaFields, args *[]interface{}) {
-  if l.IsLoggingJSON {
+  l.Mtx.RLock()
+  isLoggingJSON := l.IsLoggingJSON
+  l.Mtx.RUnlock()
+
+  if isLoggingJSON {
     l.writeJSON(time, level, m, args)
   } else {
     l.writeToFile(time, level, m, args)
@@ -906,6 +933,7 @@ func (l *Logger) PrintEnv() {
 
 func (l *Logger) JSON(args ...interface{}) {
   size := len(args)
+  var b bytes.Buffer
   for i := 0; i < size; i++ {
 
     v, err := json.Marshal(args[i])
@@ -914,16 +942,18 @@ func (l *Logger) JSON(args ...interface{}) {
       panic(err)
     }
 
-    os.Stdout.Write(v)
+    b.Write(v)
     if i < size-1 {
-      os.Stdout.Write([]byte(" "))
+      b.WriteByte(' ')
     }
   }
-  os.Stdout.Write([]byte("\n"))
+  b.WriteByte('\n')
+  l.writeOutput(os.Stdout, b.Bytes())
 }
 
 func (l *Logger) RawJSON(args ...interface{}) {
   // raw = no newlines, no spaces
+  var b bytes.Buffer
   for i := 0; i < len(args); i++ {
 
     v, err := json.Marshal(args[i])
@@ -932,8 +962,9 @@ func (l *Logger) RawJSON(args ...interface{}) {
       panic(err)
     }
 
-    os.Stdout.Write(v)
+    b.Write(v)
   }
+  l.writeOutput(os.Stdout, b.Bytes())
 }
 
 type Stringer interface {
@@ -990,16 +1021,19 @@ func doMap(v interface{}, val reflect.Value) *MapVal {
   z.GoType = val.Type().String()
 
   keyToRetrieve := "JLogMarker"
+  keyType := val.Type().Key()
+  markerKey := reflect.ValueOf(keyToRetrieve)
 
-  // Get the value associated with the key
-  // TODO: ??
-  // panic: reflect.Value.MapIndex: value of type string is not assignable to type http.connectMethodKey
-  keyValue := val.MapIndex(reflect.ValueOf(keyToRetrieve))
-
-  // Check if the key exists
-  if keyValue.IsValid() {
-    // Print the value
-    return &z
+  if markerKey.Type().AssignableTo(keyType) {
+    keyValue := val.MapIndex(markerKey)
+    if keyValue.IsValid() {
+      return &z
+    }
+  } else if markerKey.Type().ConvertibleTo(keyType) {
+    keyValue := val.MapIndex(markerKey.Convert(keyType))
+    if keyValue.IsValid() {
+      return &z
+    }
   }
 
   keys := val.MapKeys()
@@ -1113,6 +1147,10 @@ type UnkVal struct {
 func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) interface{} {
   // /
   // var rv = reflect.ValueOf(obj)
+
+  if depth > 16 {
+    return fmt.Sprintf("(go:max-depth:%T)", obj)
+  }
 
   if count > 11 {
     return obj
@@ -1370,9 +1408,13 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
   var newArgs = []interface{}{}
   var mf = NewMetaFields(&MF{})
 
+  l.Mtx.RLock()
+  isLoggingJSON := l.IsLoggingJSON
+  highPerf := l.HighPerf
   for k, v := range *l.MetaFields.m {
     (*mf.m)[k] = v
   }
+  l.Mtx.RUnlock()
 
   var hasLogId = false
 
@@ -1395,7 +1437,9 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
       hasLogId = true
     } else {
 
-      if l.IsLoggingJSON && true || !l.HighPerf {
+      if isLoggingJSON {
+        newArgs = append(newArgs, x)
+      } else if !highPerf {
         var xx = reflect.ValueOf(x)
         newArgs = append(newArgs, getInspectableVal(x, xx, 0, 1))
       } else {
@@ -1413,8 +1457,7 @@ func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{})
 }
 
 func (l *Logger) Trace(args ...interface{}) {
-  switch l.LogLevel {
-  case ll.DEBUG, ll.INFO, ll.WARN, ll.ERROR, ll.CRITICAL:
+  if !l.IsLevelEnabled(ll.TRACE) {
     return
   }
   t := time.Now()
@@ -1425,8 +1468,7 @@ func (l *Logger) Trace(args ...interface{}) {
 }
 
 func (l *Logger) Debug(args ...interface{}) {
-  switch l.LogLevel {
-  case ll.INFO, ll.WARN, ll.ERROR, ll.CRITICAL:
+  if !l.IsLevelEnabled(ll.DEBUG) {
     return
   }
   t := time.Now()
@@ -1437,8 +1479,7 @@ func (l *Logger) Debug(args ...interface{}) {
 }
 
 func (l *Logger) Info(args ...interface{}) {
-  switch l.LogLevel {
-  case ll.WARN, ll.ERROR, ll.CRITICAL:
+  if !l.IsLevelEnabled(ll.INFO) {
     return
   }
   t := time.Now()
@@ -1449,8 +1490,7 @@ func (l *Logger) Info(args ...interface{}) {
 }
 
 func (l *Logger) Warn(args ...interface{}) {
-  switch l.LogLevel {
-  case ll.ERROR, ll.CRITICAL:
+  if !l.IsLevelEnabled(ll.WARN) {
     return
   }
   t := time.Now()
@@ -1461,8 +1501,7 @@ func (l *Logger) Warn(args ...interface{}) {
 }
 
 func (l *Logger) Error(args ...interface{}) {
-  switch l.LogLevel {
-  case ll.CRITICAL:
+  if !l.IsLevelEnabled(ll.ERROR) {
     return
   }
   t := time.Now()
@@ -1475,6 +1514,9 @@ func (l *Logger) Error(args ...interface{}) {
 }
 
 func (l *Logger) Critical(args ...interface{}) {
+  if !l.IsLevelEnabled(ll.CRITICAL) {
+    return
+  }
   t := time.Now()
   n := shared.GetNextLogNum()
   var meta, newArgs = l.getMetaFields(&args)
@@ -1572,42 +1614,50 @@ func (l *Logger) Tags(z *map[string]interface{}) *Logger {
 }
 
 func (l *Logger) TraceF(s string, args ...interface{}) {
-  switch l.LogLevel {
-  case ll.DEBUG, ll.INFO, ll.WARN, ll.ERROR, ll.CRITICAL:
+  if !l.IsLevelEnabled(ll.TRACE) {
     return
   }
   t := time.Now()
-  var meta = l.MetaFields
+  n := shared.GetNextLogNum()
+  var empty []interface{}
+  var meta, _ = l.getMetaFields(&empty)
+  (*meta.m)["log_num"] = n
   l.writeSwitch(t, ll.TRACE, meta, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) DebugF(s string, args ...interface{}) {
-  switch l.LogLevel {
-  case ll.INFO, ll.WARN, ll.ERROR, ll.CRITICAL:
+  if !l.IsLevelEnabled(ll.DEBUG) {
     return
   }
   t := time.Now()
-  var meta = l.MetaFields
+  n := shared.GetNextLogNum()
+  var empty []interface{}
+  var meta, _ = l.getMetaFields(&empty)
+  (*meta.m)["log_num"] = n
   l.writeSwitch(t, ll.DEBUG, meta, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) InfoF(s string, args ...interface{}) {
-  switch l.LogLevel {
-  case ll.WARN, ll.ERROR, ll.CRITICAL:
+  if !l.IsLevelEnabled(ll.INFO) {
     return
   }
   t := time.Now()
-  var meta = l.MetaFields
+  n := shared.GetNextLogNum()
+  var empty []interface{}
+  var meta, _ = l.getMetaFields(&empty)
+  (*meta.m)["log_num"] = n
   l.writeSwitch(t, ll.INFO, meta, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) WarnF(s string, args ...interface{}) {
-  switch l.LogLevel {
-  case ll.ERROR, ll.CRITICAL:
+  if !l.IsLevelEnabled(ll.WARN) {
     return
   }
   t := time.Now()
-  var meta = l.MetaFields
+  n := shared.GetNextLogNum()
+  var empty []interface{}
+  var meta, _ = l.getMetaFields(&empty)
+  (*meta.m)["log_num"] = n
   l.writeSwitch(t, ll.WARN, meta, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
@@ -1616,56 +1666,69 @@ type StackTrace struct {
 }
 
 func (l *Logger) ErrorF(s string, args ...interface{}) {
-  switch l.LogLevel {
-  case ll.CRITICAL:
-    // only logging critical level messages!
+  if !l.IsLevelEnabled(ll.ERROR) {
     return
   }
   t := time.Now()
+  n := shared.GetNextLogNum()
   filteredStackTrace := hlpr.GetFilteredStacktrace()
   formattedString := fmt.Sprintf(s, args...)
-  var meta = l.MetaFields
+  var empty []interface{}
+  var meta, _ = l.getMetaFields(&empty)
+  (*meta.m)["log_num"] = n
   l.writeSwitch(t, ll.ERROR, meta, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
 func (l *Logger) CriticalF(s string, args ...interface{}) {
+  if !l.IsLevelEnabled(ll.CRITICAL) {
+    return
+  }
   t := time.Now()
+  n := shared.GetNextLogNum()
   filteredStackTrace := hlpr.GetFilteredStacktrace()
   formattedString := fmt.Sprintf(s, args...)
-  var meta = l.MetaFields
+  var empty []interface{}
+  var meta, _ = l.getMetaFields(&empty)
+  (*meta.m)["log_num"] = n
   l.writeSwitch(t, ll.CRITICAL, meta, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
 func (l *Logger) NewLine() {
-  safeStdout.Write([]byte("\n"))
+  l.writeOutput(os.Stdout, []byte("\n"))
 }
 
 func (l *Logger) Spaces(num int32) {
-  safeStdout.Write([]byte(strings.Join(make([]string, num), " ")))
+  if num < 1 {
+    return
+  }
+  l.writeOutput(os.Stdout, []byte(strings.Repeat(" ", int(num))))
 }
 
 func (l *Logger) Tabs(num int32) {
-  safeStdout.Write([]byte(strings.Join(make([]string, num), "\t")))
+  if num < 1 {
+    return
+  }
+  l.writeOutput(os.Stdout, []byte(strings.Repeat("\t", int(num))))
 }
 
 func (l *Logger) PlainStdout(args ...interface{}) {
-  safeStdout.Lock()
+  var b bytes.Buffer
   for _, a := range args {
     v := fmt.Sprintf("((%T) %#v) ", a, a)
-    os.Stdout.Write([]byte(v))
+    b.WriteString(v)
   }
-  os.Stdout.Write([]byte("\n"))
-  safeStdout.Unlock()
+  b.WriteByte('\n')
+  l.writeOutput(os.Stdout, b.Bytes())
 }
 
 func (l *Logger) PlainStderr(args ...interface{}) {
-  safeStderr.Lock()
+  var b bytes.Buffer
   for _, a := range args {
     v := fmt.Sprintf("((%T) %#v) ", a, a)
-    os.Stderr.Write([]byte(v))
+    b.WriteString(v)
   }
-  os.Stderr.Write([]byte("\n"))
-  safeStderr.Unlock()
+  b.WriteByte('\n')
+  l.writeOutput(os.Stderr, b.Bytes())
 }
 
 var DefaultLogger = CreateLogger("Default").

@@ -11,7 +11,7 @@ import (
   "sync"
 )
 
-var M1 = sync.Mutex{}
+var M1 = sync.RWMutex{}
 
 var IsTerminal = terminal.IsTerminal(int(os.Stdout.Fd()))
 var PID = os.Getpid()

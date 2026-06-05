@@ -23,7 +23,7 @@ func addComma(i int, n int) string {
   return ""
 }
 
-func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) string {
+func handleMap(x interface{}, size int, brk bool, depth int, cache *map[uintptr]string) string {
 
   var rv = reflect.ValueOf(x)
 
@@ -178,7 +178,7 @@ func handleMap(x interface{}, size int, brk bool, depth int, cache *map[*interfa
   return b.String()
 }
 
-func handleSliceAndArray(v interface{}, len int, brk bool, depth int, cache *map[*interface{}]string) string {
+func handleSliceAndArray(v interface{}, len int, brk bool, depth int, cache *map[uintptr]string) string {
 
   rv := reflect.ValueOf(v)
 
@@ -250,7 +250,7 @@ func createSpaces(n int, brk bool) string {
   return b.String()
 }
 
-func handleStruct(obj interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) string {
+func handleStruct(obj interface{}, size int, brk bool, depth int, cache *map[uintptr]string) string {
 
   rv := reflect.ValueOf(obj)
 
@@ -262,7 +262,7 @@ func handleStruct(obj interface{}, size int, brk bool, depth int, cache *map[*in
   t := rv.Type()
 
   if n < 1 {
-    return fmt.Sprintf(" (%s / %s) { }", t.Name, t.String())
+    return fmt.Sprintf(" (%s / %s) { }", t.Name(), t.String())
   }
 
   //log.Println("ln:", ln)
@@ -440,11 +440,11 @@ func getHighlightedString(val string) string {
   return Bold("'").String() + Green(val).String() + Bold("'").String()
 }
 
-func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache *map[*interface{}]string) (s string) {
+func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache *map[uintptr]string) (s string) {
 
   defer func() {
     if r := recover(); r != nil {
-      fmt.Println("\n")
+      fmt.Println()
       fmt.Println(fmt.Sprintf("%v", r))
       debug.PrintStack()
       s = fmt.Sprintf("%v - (go: unknown type 2: '%v')", r, v)
@@ -465,6 +465,20 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
 
   if !rv.IsValid() {
     return "<nil (invalid)>"
+  }
+
+  if depth > 16 {
+    return fmt.Sprintf("(go:max-depth:%T)", v)
+  }
+
+  if key, ok := cacheKey(rv); ok {
+    if cached, ok := (*cache)[key]; ok {
+      return cached
+    }
+    (*cache)[key] = fmt.Sprintf("(go:circular:%s)", rv.Type().String())
+    defer func() {
+      (*cache)[key] = s
+    }()
   }
 
   var kind = rv.Kind()
@@ -503,7 +517,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
     return "<nil>"
   }
 
-  if rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Ptr {
+  if rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Interface {
     return fmt.Sprintf("pointer/interface -> (%v)", rv.Type().String())
   }
 
@@ -515,7 +529,7 @@ func getStringRepresentation(v interface{}, size int, brk bool, depth int, cache
     if rv.CanInterface() {
       return fmt.Sprintf("(chan (%s) %v)", rv.Type().Elem().String(), rv.Interface())
     }
-    return fmt.Sprintf("(chan (%s) %v)", rv.Type().Elem().String())
+    return fmt.Sprintf("(chan (%s))", rv.Type().Elem().String())
   }
 
   if kind == reflect.Map {
@@ -759,25 +773,48 @@ func CopyAndDereference(s interface{}) interface{} {
 }
 
 func GetPrettyString(v interface{}, size int) string {
-  var cache = make(map[*interface{}]string)
+  var cache = make(map[uintptr]string)
   return getStringRepresentation(v, size, false, 2, &cache)
 }
 
-type Cache = *map[*interface{}]*interface{}
+type Cache = *map[uintptr]interface{}
+
+func cacheKey(v reflect.Value) (uintptr, bool) {
+  for v.IsValid() && v.Kind() == reflect.Interface {
+    if v.IsNil() {
+      return 0, false
+    }
+    v = v.Elem()
+  }
+
+  if !v.IsValid() {
+    return 0, false
+  }
+
+  switch v.Kind() {
+  case reflect.Ptr, reflect.Map, reflect.Slice:
+    if v.IsNil() {
+      return 0, false
+    }
+    return v.Pointer(), true
+  }
+
+  return 0, false
+}
 
 func copyStruct_Old(original interface{}, cache Cache) interface{} {
   originalVal := reflect.ValueOf(original)
   originalValElem := originalVal.Elem()
   originalValIntf := originalValElem.Interface()
 
-  if originalVal.Kind() == reflect.Ptr {
-    if k, ok := (*cache)[&originalValIntf]; ok {
+  if key, ok := cacheKey(originalVal); ok {
+    if k, ok := (*cache)[key]; ok {
       return k
     }
   }
 
-  if originalValElem.Kind() == reflect.Ptr {
-    if k, ok := (*cache)[&originalValIntf]; ok {
+  if key, ok := cacheKey(originalValElem); ok {
+    if k, ok := (*cache)[key]; ok {
       return k
     }
   }
@@ -926,22 +963,20 @@ func cleanStructOld(val reflect.Value) (z interface{}) {
 }
 
 func cleanMap(v interface{}, cache Cache) (z interface{}) {
-
-  // TODO: if keys to map are not strings, then create a slice/array of Key/Value Structs
-  //type KeyValuePair struct {
-  //	Key   int    `json:"key"`
-  //	Value string `json:"value"`
-  //}
-
   m := reflect.ValueOf(v)
 
-  var ret = make(map[interface{}]interface{})
+  var ret = make(map[string]interface{})
   keys := m.MapKeys()
 
   for _, k := range keys {
     val := m.MapIndex(k)
-    inf := val.Interface()
-    ret[k] = CleanUp(&inf, cache)
+    key := fmt.Sprintf("%v", k.Interface())
+    if val.IsValid() && val.CanInterface() {
+      inf := val.Interface()
+      ret[key] = CleanUp(&inf, cache)
+    } else {
+      ret[key] = fmt.Sprintf("(%s)", val.Type().String())
+    }
   }
 
   return ret
@@ -954,8 +989,12 @@ func cleanList(v interface{}, cache Cache) (z interface{}) {
 
   for i := 0; i < val.Len(); i++ {
     element := val.Index(i)
-    inf := element.Interface()
-    ret = append(ret, CleanUp(&inf, cache))
+    if element.IsValid() && element.CanInterface() {
+      inf := element.Interface()
+      ret = append(ret, CleanUp(&inf, cache))
+    } else {
+      ret = append(ret, fmt.Sprintf("(%s)", element.Type().String()))
+    }
   }
 
   return ret
@@ -983,6 +1022,17 @@ func CleanUp(v interface{}, cache Cache) (z interface{}) {
 
   if !rv.IsValid() {
     return nil
+  }
+
+  key, hasKey := cacheKey(rv)
+  if hasKey {
+    if cached, ok := (*cache)[key]; ok {
+      return cached
+    }
+    (*cache)[key] = fmt.Sprintf("(go:circular:%s)", rv.Type().String())
+    defer func() {
+      (*cache)[key] = z
+    }()
   }
 
   if rv.Kind() == reflect.Pointer || rv.Kind() == reflect.Interface {

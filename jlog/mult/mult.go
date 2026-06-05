@@ -1,6 +1,7 @@
 package mult
 
 import (
+  "bytes"
   "encoding/json"
   "errors"
   "fmt"
@@ -32,16 +33,18 @@ type FileLevel struct {
   Level   ll.LogLevel
   File    *os.File
   Tags    *map[string]interface{}
-  lock    *sync.Mutex
+  lock    *sync.RWMutex
   IsJSON  bool
   isTrace bool
   isDebug bool
   isInfo  bool
   isWarn  bool
   isError bool
+  isCritical bool
 }
 
 type MultiLogger struct {
+  Mtx        sync.RWMutex
   AppName    string
   HostName   string
   MetaFields *MetaFields
@@ -54,6 +57,7 @@ type MultiLogger struct {
   isInfo     bool
   isWarn     bool
   isError    bool
+  isCritical bool
 }
 
 type MultLoggerParams struct {
@@ -84,38 +88,35 @@ func getFileInfo(f *os.File) (string, error) {
 func mapFileLevels(x []*FileLevel) []*FileLevel {
 
   var results = []*FileLevel{}
-  var m1 = map[uintptr]*sync.Mutex{}
-  var m2 = map[string]*sync.Mutex{}
+  var m1 = map[uintptr]*sync.RWMutex{}
+  var m2 = map[string]*sync.RWMutex{}
 
   for _, z := range x {
+    if z == nil {
+      continue
+    }
+
+    if z.File == nil {
+      z.File = os.Stdout
+    }
 
     var fd = z.File.Fd()
-    //var x = z.File.Name()
-
-    if _, ok := m1[fd]; !ok {
-      m1[fd] = &sync.Mutex{}
-    }
-
-    if v, ok := m1[fd]; ok {
-      z.lock = v
-      results = append(results, z)
-      continue
-    }
-
     var fileInfo, err = getFileInfo(z.File)
 
-    if err != nil {
-      z.lock = &sync.Mutex{}
+    if err == nil {
+      if _, ok := m2[fileInfo]; !ok {
+        m2[fileInfo] = &sync.RWMutex{}
+      }
+      z.lock = m2[fileInfo]
       results = append(results, z)
       continue
     }
 
-    if _, ok := m2[fileInfo]; !ok {
-      m2[fileInfo] = &sync.Mutex{}
+    if _, ok := m1[fd]; !ok {
+      m1[fd] = &sync.RWMutex{}
     }
 
-    var mtx, _ = m2[fileInfo]
-    z.lock = mtx
+    z.lock = m1[fd]
     results = append(results, z)
 
   }
@@ -152,7 +153,8 @@ func NewMultiLogger(p MultLoggerParams) *MultiLogger {
       Level: ll.TRACE,
       File:  os.Stdout,
       Tags:  nil,
-      lock:  nil,
+      lock:  &sync.RWMutex{},
+      IsJSON: !shared.IsTerminal,
     })
   }
 
@@ -197,6 +199,7 @@ func NewMultiLogger(p MultLoggerParams) *MultiLogger {
   }
 
   var l = &MultiLogger{
+    Mtx:        sync.RWMutex{},
     AppName:    appName,
     HostName:   hostName,
     TimeZone:   p.TimeZone,
@@ -209,6 +212,7 @@ func NewMultiLogger(p MultLoggerParams) *MultiLogger {
     isInfo:     false,
     isDebug:    false,
     isTrace:    false,
+    isCritical: true,
   }
 
   l.determineInitialLogLevels()
@@ -291,6 +295,7 @@ func (l *MultiLogger) determineInitialLogLevels() {
   l.isInfo = false
   l.isWarn = false
   l.isError = true // the special one:
+  l.isCritical = true
 
   if len(l.Files) < 1 {
 
@@ -299,35 +304,67 @@ func (l *MultiLogger) determineInitialLogLevels() {
     l.isInfo = true
     l.isWarn = true
     l.isError = true
+    l.isCritical = true
 
     l.Files = append(l.Files, &FileLevel{
       Level:   ll.TRACE,
       File:    os.Stdout,
-      lock:    &sync.Mutex{},
+      lock:    &sync.RWMutex{},
+      IsJSON:  !shared.IsTerminal,
       isTrace: true,
       isDebug: true,
       isInfo:  true,
       isWarn:  true,
       isError: true,
+      isCritical: true,
     })
 
     return
   }
 
   for _, v := range l.Files {
+    if v == nil {
+      continue
+    }
 
-    // we always log errors
-    v.isError = true
+    if v.File == nil {
+      v.File = os.Stdout
+    }
+
+    if v.lock == nil {
+      v.lock = &sync.RWMutex{}
+    }
+
+    v.isTrace = false
+    v.isDebug = false
+    v.isInfo = false
+    v.isWarn = false
+    v.isError = false
+    v.isCritical = false
+
+    v.isCritical = true
 
     switch v.Level {
+    case ll.CRITICAL:
+      l.isCritical = true
+    case ll.ERROR:
+      v.isError = true
+      l.isError = true
+      l.isCritical = true
     case ll.WARN:
       v.isWarn = true
       l.isWarn = true
+      v.isError = true
+      l.isError = true
+      l.isCritical = true
     case ll.INFO:
       v.isWarn = true
       l.isWarn = true
       v.isInfo = true
       l.isInfo = true
+      v.isError = true
+      l.isError = true
+      l.isCritical = true
     case ll.DEBUG:
       v.isWarn = true
       l.isWarn = true
@@ -335,6 +372,9 @@ func (l *MultiLogger) determineInitialLogLevels() {
       l.isInfo = true
       v.isDebug = true
       l.isDebug = true
+      v.isError = true
+      l.isError = true
+      l.isCritical = true
     case ll.TRACE:
       v.isWarn = true
       l.isWarn = true
@@ -344,10 +384,14 @@ func (l *MultiLogger) determineInitialLogLevels() {
       l.isDebug = true
       v.isTrace = true
       l.isTrace = true
+      v.isError = true
+      l.isError = true
+      l.isCritical = true
     default:
       panic("should have a log-level chosen")
     }
 
+    v.isCritical = true
   }
 }
 
@@ -393,36 +437,148 @@ func (l *MultiLogger) Id(v string) *LogId {
   return Id(v)
 }
 
+func levelEnabled(minLevel ll.LogLevel, level ll.LogLevel) bool {
+  return level >= minLevel
+}
+
+func fileAllowsLevel(f *FileLevel, level ll.LogLevel) bool {
+  if f == nil {
+    return false
+  }
+
+  switch level {
+  case ll.TRACE:
+    return f.isTrace
+  case ll.DEBUG:
+    return f.isDebug
+  case ll.INFO:
+    return f.isInfo
+  case ll.WARN:
+    return f.isWarn
+  case ll.ERROR:
+    return f.isError
+  case ll.CRITICAL:
+    return f.isCritical
+  default:
+    return false
+  }
+}
+
+func V(level ll.LogLevel) bool {
+  return DefaultLogger.V(level)
+}
+
+func IsLevelEnabled(level ll.LogLevel) bool {
+  return DefaultLogger.IsLevelEnabled(level)
+}
+
+func (l *MultiLogger) V(level ll.LogLevel) bool {
+  return l.IsLevelEnabled(level)
+}
+
+func (l *MultiLogger) IsLevelEnabled(level ll.LogLevel) bool {
+  l.Mtx.RLock()
+  defer l.Mtx.RUnlock()
+
+  for _, f := range l.Files {
+    if fileAllowsLevel(f, level) {
+      return true
+    }
+  }
+
+  return false
+}
+
+func (l *MultiLogger) IsTraceEnabled() bool {
+  return l.IsLevelEnabled(ll.TRACE)
+}
+
+func (l *MultiLogger) IsDebugEnabled() bool {
+  return l.IsLevelEnabled(ll.DEBUG)
+}
+
+func (l *MultiLogger) IsInfoEnabled() bool {
+  return l.IsLevelEnabled(ll.INFO)
+}
+
+func (l *MultiLogger) IsWarnEnabled() bool {
+  return l.IsLevelEnabled(ll.WARN)
+}
+
+func (l *MultiLogger) IsErrorEnabled() bool {
+  return l.IsLevelEnabled(ll.ERROR)
+}
+
+func (l *MultiLogger) IsCriticalEnabled() bool {
+  return l.IsLevelEnabled(ll.CRITICAL)
+}
+
+func (l *MultiLogger) filesForLevel(level ll.LogLevel) []*FileLevel {
+  l.Mtx.RLock()
+  defer l.Mtx.RUnlock()
+
+  files := make([]*FileLevel, 0, len(l.Files))
+  for _, f := range l.Files {
+    if fileAllowsLevel(f, level) {
+      files = append(files, f)
+    }
+  }
+
+  return files
+}
+
+func (l *MultiLogger) writeOutput(file *os.File, b []byte) {
+  if file == nil {
+    file = os.Stdout
+  }
+
+  l.Mtx.RLock()
+  isLockedLogger := l.LockUuid != ""
+  l.Mtx.RUnlock()
+
+  if !isLockedLogger {
+    shared.M1.RLock()
+    defer shared.M1.RUnlock()
+  }
+
+  if _, err := writer.Write(file, b); err != nil {
+    l.writeToStderr("json-logging: could not write log output:", err)
+  }
+}
+
 func (l *MultiLogger) NewLoggerWithLock() (*MultiLogger, func()) {
   shared.M1.Lock()
-  defer shared.M1.Unlock()
-  var newLck = &sync.Mutex{}
-  newLck.Lock()
   var id = uuid.New().String()
   lockStack.Push(&stack.StackItem{
-    Id:  id,
-    Lck: newLck,
+    Id: id,
   })
+  l.Mtx.RLock()
+  files := append([]*FileLevel(nil), l.Files...)
   var z = MultiLogger{
+    Mtx:        sync.RWMutex{},
     AppName:    l.AppName,
     HostName:   l.HostName,
     TimeZone:   l.TimeZone,
     MetaFields: l.MetaFields,
     LockUuid:   id,
+    EnvPrefix:  l.EnvPrefix,
+    Files:      files,
+    isTrace:    l.isTrace,
+    isDebug:    l.isDebug,
+    isInfo:     l.isInfo,
+    isWarn:     l.isWarn,
+    isError:    l.isError,
+    isCritical: l.isCritical,
   }
+  l.Mtx.RUnlock()
   return &z, z.unlock
 }
 
 func (l *MultiLogger) unlock() {
-
-  shared.M1.Lock()
-  defer shared.M1.Unlock()
-
   var peek, err = lockStack.Peek()
 
   if peek == nil {
     panic("error with lib - peek should not be nil")
-    return
   }
 
   if err != nil {
@@ -434,12 +590,13 @@ func (l *MultiLogger) unlock() {
   }
 
   x, err := lockStack.Pop()
+  if err != nil {
+    panic(err)
+  }
   if x != peek {
     panic("must equal peek")
   }
-  fmt.Println("unlocking:", peek.Id)
-  peek.Lck.Unlock()
-
+  shared.M1.Unlock()
 }
 
 func (l *MultiLogger) Child(m *map[string]interface{}) *MultiLogger {

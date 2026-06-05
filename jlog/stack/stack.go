@@ -14,7 +14,7 @@ type StackItem struct {
 }
 
 type Stack struct {
-	mtx      sync.Mutex
+	mtx      sync.RWMutex
 	elements []*StackItem
 }
 
@@ -24,12 +24,12 @@ func NewStack() *Stack {
 }
 
 func (s *Stack) Print(z string) {
-	s.mtx.Lock()
+	s.mtx.RLock()
 	fmt.Println(z)
 	for i := 0; i < len(s.elements); i++ {
 		fmt.Println(fmt.Sprintf("%v %+v", i, s.elements[i]))
 	}
-	s.mtx.Unlock()
+	s.mtx.RUnlock()
 }
 
 // Push adds an element to the top of the stack.
@@ -63,8 +63,8 @@ func (s *Stack) Pop() (*StackItem, error) {
 // Peek returns the top element of the stack without removing it. If the stack is empty, an error is returned.
 func (s *Stack) Peek() (*StackItem, error) {
 	//
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
+	s.mtx.RLock()
+	defer s.mtx.RUnlock()
 
 	if len(s.elements) == 0 {
 		return nil, errors.New("stack is empty")
@@ -76,7 +76,7 @@ func (s *Stack) Peek() (*StackItem, error) {
 // IsEmpty checks whether the stack is empty.
 func (s *Stack) IsEmpty() bool {
 	//
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
+	s.mtx.RLock()
+	defer s.mtx.RUnlock()
 	return len(s.elements) == 0
 }
