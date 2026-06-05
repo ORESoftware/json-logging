@@ -1,64 +1,64 @@
 package lib
 
 import (
-  "encoding/base64"
-  "encoding/json"
-  "errors"
-  "fmt"
-  uuid "github.com/google/uuid"
-  au "github.com/oresoftware/json-logging/jlog/au"
-  hlpr "github.com/oresoftware/json-logging/jlog/helper"
-  ll "github.com/oresoftware/json-logging/jlog/level"
-  "github.com/oresoftware/json-logging/jlog/shared"
-  "github.com/oresoftware/json-logging/jlog/stack"
-  "github.com/oresoftware/json-logging/jlog/writer"
-  "log"
-  "math"
-  "os"
-  "reflect"
-  "runtime"
-  "runtime/debug"
-  "sort"
-  "strconv"
-  "strings"
-  "sync"
-  "time"
-  // "unsafe"
-  "unsafe"
-  "github.com/logrusorgru/aurora/v4"
-  //jsoniter "github.com/json-iterator/go"
-  "github.com/mailru/easyjson"
-  "bytes"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	uuid "github.com/google/uuid"
+	au "github.com/oresoftware/json-logging/jlog/au"
+	hlpr "github.com/oresoftware/json-logging/jlog/helper"
+	ll "github.com/oresoftware/json-logging/jlog/level"
+	"github.com/oresoftware/json-logging/jlog/shared"
+	"github.com/oresoftware/json-logging/jlog/stack"
+	"github.com/oresoftware/json-logging/jlog/writer"
+	"log"
+	"math"
+	"os"
+	"reflect"
+	"runtime"
+	"runtime/debug"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+	// "unsafe"
+	"github.com/logrusorgru/aurora/v4"
+	"unsafe"
+	//jsoniter "github.com/json-iterator/go"
+	"bytes"
+	"github.com/mailru/easyjson"
 )
 
 // TODO: use a better json lib for encoding?
 //var jsn = jsoniter.ConfigCompatibleWithStandardLibrary
 
 func writeToStderr(args ...interface{}) {
-  if _, err := safeStderr.Write([]byte(fmt.Sprintln(args...))); err != nil {
-    fmt.Println("adcca45f-8d7b-4d4a-8fd2-7683b7b375b5", "could not write to stderr:", err)
-  }
+	if _, err := safeStderr.Write([]byte(fmt.Sprintln(args...))); err != nil {
+		fmt.Println("adcca45f-8d7b-4d4a-8fd2-7683b7b375b5", "could not write to stderr:", err)
+	}
 }
 
 func isBase64Perf(s string) bool {
-  if len(s) > 0 && s[len(s)-1] == '=' {
-    return true
-  }
-  return false
+	if len(s) > 0 && s[len(s)-1] == '=' {
+		return true
+	}
+	return false
 }
 
 func isBase64(s string) bool {
-  _, err := base64.StdEncoding.DecodeString(s)
-  return err == nil
+	_, err := base64.StdEncoding.DecodeString(s)
+	return err == nil
 }
 
 // base64ToString decodes a base64-encoded string to a regular string
 func base64ToString(s string) (string, error) {
-  decodedBytes, err := base64.StdEncoding.DecodeString(s)
-  if err != nil {
-    return "", err
-  }
-  return string(decodedBytes), nil
+	decodedBytes, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return "", err
+	}
+	return string(decodedBytes), nil
 }
 
 var safeStdout = writer.NewSafeWriter(os.Stdout)
@@ -67,130 +67,130 @@ var safeStderr = writer.NewSafeWriter(os.Stderr)
 var lockStack = stack.NewStack()
 
 type Logger struct {
-  Mtx           sync.RWMutex
-  AppName       string
-  IsLoggingJSON bool
-  HighPerf      bool
-  HostName      string
-  ForceJSON     bool
-  ForceNonJSON  bool
-  TimeZone      *time.Location
-  MetaFields    *MetaFields
-  LockUuid      string
-  EnvPrefix     string
-  LogLevel      ll.LogLevel
-  File          *os.File
-  IsShowLocalTZ bool
+	Mtx           sync.RWMutex
+	AppName       string
+	IsLoggingJSON bool
+	HighPerf      bool
+	HostName      string
+	ForceJSON     bool
+	ForceNonJSON  bool
+	TimeZone      *time.Location
+	MetaFields    *MetaFields
+	LockUuid      string
+	EnvPrefix     string
+	LogLevel      ll.LogLevel
+	File          *os.File
+	IsShowLocalTZ bool
 }
 
 type LoggerParams struct {
-  AppName       string
-  IsLoggingJSON bool
-  HostName      string
-  ForceJSON     bool
-  ForceNonJSON  bool
-  MetaFields    *MetaFields
-  TimeZone      *time.Location
-  LockUuid      string
-  EnvPrefix     string
-  LogLevel      ll.LogLevel
-  File          *os.File
-  IsShowLocalTZ bool
+	AppName       string
+	IsLoggingJSON bool
+	HostName      string
+	ForceJSON     bool
+	ForceNonJSON  bool
+	MetaFields    *MetaFields
+	TimeZone      *time.Location
+	LockUuid      string
+	EnvPrefix     string
+	LogLevel      ll.LogLevel
+	File          *os.File
+	IsShowLocalTZ bool
 }
 
 func NewLogger(p LoggerParams) *Logger {
 
-  file := p.File
+	file := p.File
 
-  if file == nil {
-    file = os.Stdout
-  }
+	if file == nil {
+		file = os.Stdout
+	}
 
-  hostName := p.HostName
+	hostName := p.HostName
 
-  if hostName == "" {
+	if hostName == "" {
 
-    hostName = os.Getenv("HOSTNAME")
-    if hostName == "" {
-      hn, err := os.Hostname()
-      if err != nil {
-        hostName = "<unknown_hostname>"
-      } else {
-        hostName = hn
-      }
-    }
-  }
+		hostName = os.Getenv("HOSTNAME")
+		if hostName == "" {
+			hn, err := os.Hostname()
+			if err != nil {
+				hostName = "<unknown_hostname>"
+			} else {
+				hostName = hn
+			}
+		}
+	}
 
-  var isLoggingJson = !shared.IsTerminal
+	var isLoggingJson = !shared.IsTerminal
 
-  if p.ForceJSON {
-    isLoggingJson = true
-  }
+	if p.ForceJSON {
+		isLoggingJson = true
+	}
 
-  if os.Getenv("jlog_log_json") == "no" {
-    isLoggingJson = false
-  }
+	if os.Getenv("jlog_log_json") == "no" {
+		isLoggingJson = false
+	}
 
-  if os.Getenv("jlog_log_json") == "yes" {
-    if p.ForceJSON {
-      writeToStderr("forceJSON:true was used, but the 'jlog_log_json' env var was set to 'yes'.")
-    }
-    isLoggingJson = true
-  }
+	if os.Getenv("jlog_log_json") == "yes" {
+		if p.ForceJSON {
+			writeToStderr("forceJSON:true was used, but the 'jlog_log_json' env var was set to 'yes'.")
+		}
+		isLoggingJson = true
+	}
 
-  var metaFields = NewMetaFields(&MF{})
+	var metaFields = NewMetaFields(&MF{})
 
-  if len(p.EnvPrefix) > 0 {
-    for _, env := range os.Environ() {
-      parts := strings.SplitN(env, "=", 2)
-      key := parts[0]
-      value := parts[1]
-      if strings.HasPrefix(key, p.EnvPrefix) {
-        result := strings.TrimPrefix(key, p.EnvPrefix)
-        (*metaFields.m)[result] = value
-      }
-    }
-  }
+	if len(p.EnvPrefix) > 0 {
+		for _, env := range os.Environ() {
+			parts := strings.SplitN(env, "=", 2)
+			key := parts[0]
+			value := parts[1]
+			if strings.HasPrefix(key, p.EnvPrefix) {
+				result := strings.TrimPrefix(key, p.EnvPrefix)
+				(*metaFields.m)[result] = value
+			}
+		}
+	}
 
-  if p.MetaFields != nil && p.MetaFields.m != nil {
-    for k, v := range *p.MetaFields.m {
-      (*metaFields.m)[k] = v
-    }
-  }
+	if p.MetaFields != nil && p.MetaFields.m != nil {
+		for k, v := range *p.MetaFields.m {
+			(*metaFields.m)[k] = v
+		}
+	}
 
-  var appName = "<app>"
-  if p.AppName != "" {
-    appName = p.AppName
-  }
+	var appName = "<app>"
+	if p.AppName != "" {
+		appName = p.AppName
+	}
 
-  return &Logger{
-    Mtx:           sync.RWMutex{},
-    AppName:       appName,
-    IsLoggingJSON: isLoggingJson,
-    HostName:      hostName,
-    ForceJSON:     p.ForceJSON,
-    ForceNonJSON:  p.ForceNonJSON,
-    TimeZone:      p.TimeZone,
-    MetaFields:    metaFields,
-    LockUuid:      p.LockUuid,
-    EnvPrefix:     p.EnvPrefix,
-    LogLevel:      p.LogLevel,
-    File:          file,
-  }
+	return &Logger{
+		Mtx:           sync.RWMutex{},
+		AppName:       appName,
+		IsLoggingJSON: isLoggingJson,
+		HostName:      hostName,
+		ForceJSON:     p.ForceJSON,
+		ForceNonJSON:  p.ForceNonJSON,
+		TimeZone:      p.TimeZone,
+		MetaFields:    metaFields,
+		LockUuid:      p.LockUuid,
+		EnvPrefix:     p.EnvPrefix,
+		LogLevel:      p.LogLevel,
+		File:          file,
+	}
 }
 
 func NewBasicLogger(AppName string, envTokenPrefix string, level ll.LogLevel) *Logger {
-  return NewLogger(LoggerParams{
-    AppName:   AppName,
-    EnvPrefix: envTokenPrefix,
-    LogLevel:  level,
-  })
+	return NewLogger(LoggerParams{
+		AppName:   AppName,
+		EnvPrefix: envTokenPrefix,
+		LogLevel:  level,
+	})
 }
 
 func CreateLogger(AppName string) *Logger {
-  return NewLogger(LoggerParams{
-    AppName: AppName,
-  })
+	return NewLogger(LoggerParams{
+		AppName: AppName,
+	})
 }
 
 // func NewLogger(AppName string, forceJSON bool, hostName string, envTokenPrefix string) *Logger {
@@ -198,20 +198,20 @@ func CreateLogger(AppName string) *Logger {
 // }
 
 type KV struct {
-  Key   string
-  Value interface{}
-  *metaFieldsMarker
+	Key   string
+	Value interface{}
+	*metaFieldsMarker
 }
 
 type M = map[string]interface{}
 type L = []KV
 
 func NewMetaFields(m *MF) *MetaFields {
-  return &MetaFields{
-    metaFieldsMarker: mfMarker,
-    UniqueMarker:     "UniqueMarker(Brand)",
-    m:                m,
-  }
+	return &MetaFields{
+		metaFieldsMarker: mfMarker,
+		UniqueMarker:     "UniqueMarker(Brand)",
+		m:                m,
+	}
 }
 
 type logIdMarker struct{}
@@ -219,1311 +219,1309 @@ type logIdMarker struct{}
 var myLogIdMarker = &logIdMarker{}
 
 type LogId struct {
-  *logIdMarker
-  Val string
+	*logIdMarker
+	Val string
 }
 
 func (x *LogId) GetLogId(isHyperLink bool) string {
-  // fmt.Println("\\e]8;;http://example.com\aThis is the link\\e]8;;\\e\\")
-  // fmt.Println(fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", "https://linkedin.com", "Go to Linked"))
+	// fmt.Println("\\e]8;;http://example.com\aThis is the link\\e]8;;\\e\\")
+	// fmt.Println(fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", "https://linkedin.com", "Go to Linked"))
 
-  // fmt.Println(fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", "Go to x", "Go to XX"))
+	// fmt.Println(fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", "Go to x", "Go to XX"))
 
-  if false && isHyperLink {
-    // return au.Col.Blue("xyz1").Hyperlink(fmt.Sprintf("foobarbas", x.Val)).HyperlinkTarget()
-    return au.Col.Hyperlink("foo", "https://foo.com").String()
-    return au.Col.Hyperlink("foo", "https://foo.com").HyperlinkTarget()
-    // return au.Col.Blue("(Goto -> LogId)").Hyperlink(fmt.Sprintf("http://vibeirl.com/dev/links?%s", x.Val)).HyperlinkTarget()
-  } else {
-    // return fmt.Sprintf("(log-id:'%s')", x.Val)
-    return x.Val
-  }
+	if false && isHyperLink {
+		// return au.Col.Blue("xyz1").Hyperlink(fmt.Sprintf("foobarbas", x.Val)).HyperlinkTarget()
+		return au.Col.Hyperlink("foo", "https://foo.com").String()
+		return au.Col.Hyperlink("foo", "https://foo.com").HyperlinkTarget()
+		// return au.Col.Blue("(Goto -> LogId)").Hyperlink(fmt.Sprintf("http://vibeirl.com/dev/links?%s", x.Val)).HyperlinkTarget()
+	} else {
+		// return fmt.Sprintf("(log-id:'%s')", x.Val)
+		return x.Val
+	}
 }
 
 func (x *LogId) IsLogId() bool {
-  return true
+	return true
 }
 
 func Id(v string) *LogId {
-  return &LogId{myLogIdMarker, v}
+	return &LogId{myLogIdMarker, v}
 }
 
 func (l *Logger) Id(v string) *LogId {
-  return Id(v)
+	return Id(v)
 }
 
 func levelEnabled(minLevel ll.LogLevel, level ll.LogLevel) bool {
-  return level >= minLevel
+	return level >= minLevel
 }
 
 func V(level ll.LogLevel) bool {
-  return DefaultLogger.V(level)
+	return DefaultLogger.V(level)
 }
 
 func IsLevelEnabled(level ll.LogLevel) bool {
-  return DefaultLogger.IsLevelEnabled(level)
+	return DefaultLogger.IsLevelEnabled(level)
 }
 
 func (l *Logger) V(level ll.LogLevel) bool {
-  return l.IsLevelEnabled(level)
+	return l.IsLevelEnabled(level)
 }
 
 func (l *Logger) IsLevelEnabled(level ll.LogLevel) bool {
-  l.Mtx.RLock()
-  defer l.Mtx.RUnlock()
-  return levelEnabled(l.LogLevel, level)
+	l.Mtx.RLock()
+	defer l.Mtx.RUnlock()
+	return levelEnabled(l.LogLevel, level)
 }
 
 func (l *Logger) IsTraceEnabled() bool {
-  return l.IsLevelEnabled(ll.TRACE)
+	return l.IsLevelEnabled(ll.TRACE)
 }
 
 func (l *Logger) IsDebugEnabled() bool {
-  return l.IsLevelEnabled(ll.DEBUG)
+	return l.IsLevelEnabled(ll.DEBUG)
 }
 
 func (l *Logger) IsInfoEnabled() bool {
-  return l.IsLevelEnabled(ll.INFO)
+	return l.IsLevelEnabled(ll.INFO)
 }
 
 func (l *Logger) IsWarnEnabled() bool {
-  return l.IsLevelEnabled(ll.WARN)
+	return l.IsLevelEnabled(ll.WARN)
 }
 
 func (l *Logger) IsErrorEnabled() bool {
-  return l.IsLevelEnabled(ll.ERROR)
+	return l.IsLevelEnabled(ll.ERROR)
 }
 
 func (l *Logger) IsCriticalEnabled() bool {
-  return l.IsLevelEnabled(ll.CRITICAL)
+	return l.IsLevelEnabled(ll.CRITICAL)
 }
 
 func (l *Logger) outputFile() *os.File {
-  l.Mtx.RLock()
-  defer l.Mtx.RUnlock()
-  if l.File == nil {
-    return os.Stdout
-  }
-  return l.File
+	l.Mtx.RLock()
+	defer l.Mtx.RUnlock()
+	if l.File == nil {
+		return os.Stdout
+	}
+	return l.File
 }
 
 func (l *Logger) writeOutput(f *os.File, b []byte) {
-  if f == nil {
-    f = os.Stdout
-  }
+	if f == nil {
+		f = os.Stdout
+	}
 
-  l.Mtx.RLock()
-  isLockedLogger := l.LockUuid != ""
-  l.Mtx.RUnlock()
+	l.Mtx.RLock()
+	isLockedLogger := l.LockUuid != ""
+	l.Mtx.RUnlock()
 
-  if !isLockedLogger {
-    shared.M1.RLock()
-    defer shared.M1.RUnlock()
-  }
+	if !isLockedLogger {
+		shared.M1.RLock()
+		defer shared.M1.RUnlock()
+	}
 
-  if _, err := writer.Write(f, b); err != nil {
-    writeToStderr("json-logging: could not write log output:", err)
-  }
+	if _, err := writer.Write(f, b); err != nil {
+		writeToStderr("json-logging: could not write log output:", err)
+	}
 }
 
 func (l *Logger) NewLoggerWithLock() (*Logger, func()) {
-  shared.M1.Lock()
-  var id = uuid.New().String()
-  lockStack.Push(&stack.StackItem{
-    Id: id,
-  })
-  l.Mtx.RLock()
-  var z = Logger{
-    Mtx:           sync.RWMutex{},
-    AppName:       l.AppName,
-    IsLoggingJSON: l.IsLoggingJSON,
-    HighPerf:      l.HighPerf,
-    HostName:      l.HostName,
-    ForceJSON:     l.ForceJSON,
-    ForceNonJSON:  l.ForceNonJSON,
-    TimeZone:      l.TimeZone,
-    MetaFields:    l.MetaFields,
-    LockUuid:      id,
-    EnvPrefix:     l.EnvPrefix,
-    LogLevel:      l.LogLevel,
-    File:          l.File,
-    IsShowLocalTZ: l.IsShowLocalTZ,
-  }
-  l.Mtx.RUnlock()
-  return &z, z.unlock
+	shared.M1.Lock()
+	var id = uuid.New().String()
+	lockStack.Push(&stack.StackItem{
+		Id: id,
+	})
+	l.Mtx.RLock()
+	var z = Logger{
+		Mtx:           sync.RWMutex{},
+		AppName:       l.AppName,
+		IsLoggingJSON: l.IsLoggingJSON,
+		HighPerf:      l.HighPerf,
+		HostName:      l.HostName,
+		ForceJSON:     l.ForceJSON,
+		ForceNonJSON:  l.ForceNonJSON,
+		TimeZone:      l.TimeZone,
+		MetaFields:    l.MetaFields,
+		LockUuid:      id,
+		EnvPrefix:     l.EnvPrefix,
+		LogLevel:      l.LogLevel,
+		File:          l.File,
+		IsShowLocalTZ: l.IsShowLocalTZ,
+	}
+	l.Mtx.RUnlock()
+	return &z, z.unlock
 }
 
 func (l *Logger) SetHighPerf(b bool) *Logger {
-  l.Mtx.Lock()
-  defer l.Mtx.Unlock()
-  l.HighPerf = b
-  return l
+	l.Mtx.Lock()
+	defer l.Mtx.Unlock()
+	l.HighPerf = b
+	return l
 }
 
 func (l *Logger) SetEnvPrefix(s string) *Logger {
-  l.Mtx.Lock()
-  defer l.Mtx.Unlock()
+	l.Mtx.Lock()
+	defer l.Mtx.Unlock()
 
-  l.EnvPrefix = s
+	l.EnvPrefix = s
 
-  if len(l.EnvPrefix) > 0 {
-    for _, env := range os.Environ() {
-      parts := strings.SplitN(env, "=", 2)
-      key := parts[0]
-      value := parts[1]
-      if strings.HasPrefix(key, l.EnvPrefix) {
-        result := strings.TrimPrefix(key, l.EnvPrefix)
-        (*l.MetaFields.m)[result] = value
-      }
-    }
-  }
+	if len(l.EnvPrefix) > 0 {
+		for _, env := range os.Environ() {
+			parts := strings.SplitN(env, "=", 2)
+			key := parts[0]
+			value := parts[1]
+			if strings.HasPrefix(key, l.EnvPrefix) {
+				result := strings.TrimPrefix(key, l.EnvPrefix)
+				(*l.MetaFields.m)[result] = value
+			}
+		}
+	}
 
-  return l
+	return l
 }
 
 func (l *Logger) SetToDisplayUTC() *Logger {
-  // TODO: use lock to set this
-  l.Mtx.Lock()
-  defer l.Mtx.Unlock()
-  l.IsShowLocalTZ = false
-  return l
+	// TODO: use lock to set this
+	l.Mtx.Lock()
+	defer l.Mtx.Unlock()
+	l.IsShowLocalTZ = false
+	return l
 }
 
 func (l *Logger) SetToUseTZ() *Logger {
-  // TODO: use lock to set this
-  l.Mtx.Lock()
-  defer l.Mtx.Unlock()
-  l.IsShowLocalTZ = false
-  return l
+	// TODO: use lock to set this
+	l.Mtx.Lock()
+	defer l.Mtx.Unlock()
+	l.IsShowLocalTZ = false
+	return l
 }
 
 func (l *Logger) SetToDisplayLocalTZ() *Logger {
-  // TODO: use lock to set this
-  l.Mtx.Lock()
-  defer l.Mtx.Unlock()
-  l.IsShowLocalTZ = true
-  return l
+	// TODO: use lock to set this
+	l.Mtx.Lock()
+	defer l.Mtx.Unlock()
+	l.IsShowLocalTZ = true
+	return l
 }
 
 func (l *Logger) SetOutputFile(f *os.File) *Logger {
-  // TODO: use lock to set this
-  l.Mtx.Lock()
-  defer l.Mtx.Unlock()
-  l.File = f
-  return l
+	// TODO: use lock to set this
+	l.Mtx.Lock()
+	defer l.Mtx.Unlock()
+	l.File = f
+	return l
 }
 
 func (l *Logger) SetLogLevel(f ll.LogLevel) *Logger {
-  l.Mtx.Lock()
-  defer l.Mtx.Unlock()
-  l.LogLevel = f
-  return l
+	l.Mtx.Lock()
+	defer l.Mtx.Unlock()
+	l.LogLevel = f
+	return l
 }
 
 func (l *Logger) AddMetaField(s string, v interface{}) *Logger {
-  l.Mtx.Lock()
-  defer l.Mtx.Unlock()
-  (*l.MetaFields.m)[s] = v
-  return l
+	l.Mtx.Lock()
+	defer l.Mtx.Unlock()
+	(*l.MetaFields.m)[s] = v
+	return l
 }
 
 func (l *Logger) SetToJSONOutput() *Logger {
-  l.Mtx.Lock()
-  defer l.Mtx.Unlock()
-  l.IsLoggingJSON = true
-  return l
+	l.Mtx.Lock()
+	defer l.Mtx.Unlock()
+	l.IsLoggingJSON = true
+	return l
 }
 
 func (l *Logger) SetAppName(h string) *Logger {
-  l.Mtx.Lock()
-  defer l.Mtx.Unlock()
-  l.AppName = h
-  return l
+	l.Mtx.Lock()
+	defer l.Mtx.Unlock()
+	l.AppName = h
+	return l
 }
 
 func (l *Logger) SetTimeZone(h time.Location) *Logger {
-  l.Mtx.Lock()
-  defer l.Mtx.Unlock()
-  l.TimeZone = &h
-  return l
+	l.Mtx.Lock()
+	defer l.Mtx.Unlock()
+	l.TimeZone = &h
+	return l
 }
 
 func (l *Logger) SetHostName(h string) *Logger {
-  l.Mtx.Lock()
-  defer l.Mtx.Unlock()
-  l.HostName = h
-  return l
+	l.Mtx.Lock()
+	defer l.Mtx.Unlock()
+	l.HostName = h
+	return l
 }
 
 func (l *Logger) unlock() {
-  var peek, err = lockStack.Peek()
+	var peek, err = lockStack.Peek()
 
-  if peek == nil {
-    panic("error with lib - peek should not be nil")
-  }
+	if peek == nil {
+		panic("error with lib - peek should not be nil")
+	}
 
-  if err != nil {
-    panic("error should be nil if peek item exists")
-  }
+	if err != nil {
+		panic("error should be nil if peek item exists")
+	}
 
-  if peek.Id != l.LockUuid {
-    panic("lock ids do not match")
-  }
+	if peek.Id != l.LockUuid {
+		panic("lock ids do not match")
+	}
 
-  x, err := lockStack.Pop()
-  if x != peek {
-    panic("must equal peek")
-  }
-  if err != nil {
-    panic(err)
-  }
-  shared.M1.Unlock()
+	x, err := lockStack.Pop()
+	if x != peek {
+		panic("must equal peek")
+	}
+	if err != nil {
+		panic(err)
+	}
+	shared.M1.Unlock()
 }
 
 func (l *Logger) Child(m *map[string]interface{}) *Logger {
 
-  l.Mtx.RLock()
-  defer l.Mtx.RUnlock()
+	l.Mtx.RLock()
+	defer l.Mtx.RUnlock()
 
-  var z = make(map[string]interface{})
-  for k, v := range *l.MetaFields.m {
-    z[k] = hlpr.CopyAndDereference(v)
-  }
+	var z = make(map[string]interface{})
+	for k, v := range *l.MetaFields.m {
+		z[k] = hlpr.CopyAndDereference(v)
+	}
 
-  for k, v := range *m {
-    z[k] = hlpr.CopyAndDereference(v)
-  }
+	for k, v := range *m {
+		z[k] = hlpr.CopyAndDereference(v)
+	}
 
-  return &Logger{
-    Mtx:           sync.RWMutex{},
-    AppName:       l.AppName,
-    IsLoggingJSON: l.IsLoggingJSON,
-    HighPerf:      l.HighPerf,
-    HostName:      l.HostName,
-    ForceJSON:     l.ForceJSON,
-    ForceNonJSON:  l.ForceNonJSON,
-    TimeZone:      l.TimeZone,
-    MetaFields:    NewMetaFields(&z),
-    LockUuid:      l.LockUuid,
-    EnvPrefix:     l.EnvPrefix,
-    LogLevel:      l.LogLevel,
-    File:          l.File,
-    IsShowLocalTZ: l.IsShowLocalTZ,
-  }
+	return &Logger{
+		Mtx:           sync.RWMutex{},
+		AppName:       l.AppName,
+		IsLoggingJSON: l.IsLoggingJSON,
+		HighPerf:      l.HighPerf,
+		HostName:      l.HostName,
+		ForceJSON:     l.ForceJSON,
+		ForceNonJSON:  l.ForceNonJSON,
+		TimeZone:      l.TimeZone,
+		MetaFields:    NewMetaFields(&z),
+		LockUuid:      l.LockUuid,
+		EnvPrefix:     l.EnvPrefix,
+		LogLevel:      l.LogLevel,
+		File:          l.File,
+		IsShowLocalTZ: l.IsShowLocalTZ,
+	}
 }
 
 type SprintFStruct struct {
-  SprintF string
+	SprintF string
 }
 
 func getLastXChars(count int, s interface{}) string {
-  // Check if the string length is less than 13
+	// Check if the string length is less than 13
 
-  if s, ok := s.(string); ok {
-    if len(s) < count {
-      return s // Return the original string if it's too short
-    }
-    // Return the last 13 characters
-    return s[len(s)-count:]
-  }
+	if s, ok := s.(string); ok {
+		if len(s) < count {
+			return s // Return the original string if it's too short
+		}
+		// Return the last 13 characters
+		return s[len(s)-count:]
+	}
 
-  return "<(not a string)>"
+	return "<(not a string)>"
 }
 
 func (l *Logger) Create(m *map[string]interface{}) *Logger {
-  return l.Child(m)
+	return l.Child(m)
 }
 
 func (l *Logger) writeToFile(ts time.Time, level ll.LogLevel, m *MetaFields, args *[]interface{}) {
-  b := l.getPrettyString(ts, level, m, args)
-  l.writeOutput(l.outputFile(), []byte(b.String()))
-  // _, err := io.Copy(l.File, b.)  // TODO: copy to file, instead of buffering b.String()
+	b := l.getPrettyString(ts, level, m, args)
+	l.writeOutput(l.outputFile(), []byte(b.String()))
+	// _, err := io.Copy(l.File, b.)  // TODO: copy to file, instead of buffering b.String()
 }
 
 func (l *Logger) getPrettyString(ts time.Time, level ll.LogLevel, m *MetaFields, args *[]interface{}) *strings.Builder {
 
-  l.Mtx.RLock()
-  appName := l.AppName
-  isShowLocalTZ := l.IsShowLocalTZ
-  timeZone := l.TimeZone
-  l.Mtx.RUnlock()
+	l.Mtx.RLock()
+	appName := l.AppName
+	isShowLocalTZ := l.IsShowLocalTZ
+	timeZone := l.TimeZone
+	l.Mtx.RUnlock()
 
-  var b strings.Builder
-  date := ts.UTC().String()[11:25] // only first 25 chars
+	var b strings.Builder
+	date := ts.UTC().Format("15:04:05.000000")
 
-  if isShowLocalTZ {
-    if timeZone != nil {
-      date = ts.UTC().In(timeZone).String()[11:25]
-    } else {
-      date = ts.Local().String()[11:25] // only first 25 chars
-    }
-  }
+	if isShowLocalTZ {
+		if timeZone != nil {
+			date = ts.UTC().In(timeZone).Format("15:04:05.000000")
+		} else {
+			date = ts.Local().Format("15:04:05.000000")
+		}
+	}
 
-  stylizedLevel := "<undefined>"
+	stylizedLevel := "<undefined>"
 
-  switch level {
+	switch level {
 
-  case ll.ERROR:
-    stylizedLevel = au.Col.Underline(au.Col.Bold(au.Col.Red("ERROR"))).String()
-    break
+	case ll.ERROR:
+		stylizedLevel = au.Col.Underline(au.Col.Bold(au.Col.Red("ERROR"))).String()
+		break
 
-  case ll.WARN:
-    stylizedLevel = au.Col.Magenta("WARN").String()
-    break
+	case ll.WARN:
+		stylizedLevel = au.Col.Magenta("WARN").String()
+		break
 
-  case ll.DEBUG:
-    stylizedLevel = au.Col.Bold("DEBUG").String()
-    break
+	case ll.DEBUG:
+		stylizedLevel = au.Col.Bold("DEBUG").String()
+		break
 
-  case ll.INFO:
-    stylizedLevel = au.Col.Gray(12, "INFO").String()
-    break
+	case ll.INFO:
+		stylizedLevel = au.Col.Gray(12, "INFO").String()
+		break
 
-  case ll.TRACE:
-    stylizedLevel = au.Col.Gray(4, "TRACE").String()
-    break
-  }
+	case ll.TRACE:
+		stylizedLevel = au.Col.Gray(4, "TRACE").String()
+		break
+	}
 
-  b.WriteString(au.Col.Gray(9, date).String())
-  b.WriteString(" ")
-  b.WriteString(stylizedLevel)
-  b.WriteString(" ")
-  b.WriteString(au.Col.Gray(12, "app:").String())
-  b.WriteString(au.Col.Italic(appName).String())
-  b.WriteString(" ")
-  if v, ok := (*m.m)["log_id"]; ok {
-    //b.WriteString(fmt.Sprintf("(log-id:%s) ", v))
-    b.WriteString(fmt.Sprintf("(%s%s) ", aurora.Bold("log-id:").String(), getLastXChars(12, v)))
-  }
+	b.WriteString(au.Col.Gray(9, date).String())
+	b.WriteString(" ")
+	b.WriteString(stylizedLevel)
+	b.WriteString(" ")
+	b.WriteString(au.Col.Gray(12, "app:").String())
+	b.WriteString(au.Col.Italic(appName).String())
+	b.WriteString(" ")
+	if v, ok := (*m.m)["log_id"]; ok {
+		//b.WriteString(fmt.Sprintf("(log-id:%s) ", v))
+		b.WriteString(fmt.Sprintf("(%s%s) ", aurora.Bold("log-id:").String(), getLastXChars(12, v)))
+	}
 
-  if v, ok := (*m.m)["log_num"]; ok {
-    //b.WriteString(fmt.Sprintf("(log-id:%s) ", v))
-    b.WriteString(fmt.Sprintf("(%s%v) ", aurora.Bold("log-num:").String(), v))
-  }
+	if v, ok := (*m.m)["log_num"]; ok {
+		//b.WriteString(fmt.Sprintf("(log-id:%s) ", v))
+		b.WriteString(fmt.Sprintf("(%s%v) ", aurora.Bold("log-num:").String(), v))
+	}
 
-  size := 0
+	size := 0
 
-  for _, v := range *args {
+	for _, v := range *args {
 
-    var primitive = true
+		var primitive = true
 
-    if v == nil {
-      b.WriteString(fmt.Sprintf("<nil 1> - (%T)", v))
-      continue
-    }
+		if v == nil {
+			b.WriteString(fmt.Sprintf("<nil 1> - (%T)", v))
+			continue
+		}
 
-    if &v == nil {
-      b.WriteString(fmt.Sprintf("<nil 2> (%T)", v))
-      continue
-    }
+		if &v == nil {
+			b.WriteString(fmt.Sprintf("<nil 2> (%T)", v))
+			continue
+		}
 
-    var rv = reflect.ValueOf(v)
-    var t = reflect.TypeOf(v)
-    var kind = t.Kind()
+		var rv = reflect.ValueOf(v)
+		var t = reflect.TypeOf(v)
+		var kind = t.Kind()
 
-    if !rv.IsValid() {
-      b.WriteString(fmt.Sprintf("%v", v))
-      continue
-    }
+		if !rv.IsValid() {
+			b.WriteString(fmt.Sprintf("%v", v))
+			continue
+		}
 
-    var counter = 0
+		var counter = 0
 
-    for {
+		for {
 
-      if !(kind == reflect.Ptr || kind == reflect.Interface) {
-        break
-      }
+			if !(kind == reflect.Ptr || kind == reflect.Interface) {
+				break
+			}
 
-      if rv.IsNil() {
-        v = nil
-        break
-      }
+			if rv.IsNil() {
+				v = nil
+				break
+			}
 
-      if !rv.IsValid() { // Check if the dereferenced value is valid
-        v = nil
-        break
-      }
+			if !rv.IsValid() { // Check if the dereferenced value is valid
+				v = nil
+				break
+			}
 
-      rv = rv.Elem()
+			rv = rv.Elem()
 
-      if !rv.IsValid() { // Check if the dereferenced value is valid
-        v = nil
-        break
-      }
+			if !rv.IsValid() { // Check if the dereferenced value is valid
+				v = nil
+				break
+			}
 
-      t = rv.Type()
-      kind = rv.Kind()
-      v = rv.Interface()
-      if counter++; counter > 6 {
-        break
-      }
+			t = rv.Type()
+			kind = rv.Kind()
+			v = rv.Interface()
+			if counter++; counter > 6 {
+				break
+			}
 
-    }
+		}
 
-    if !rv.IsValid() {
-      b.WriteString(fmt.Sprintf("(%v)) - (%T)", v, v))
-    }
+		if !rv.IsValid() {
+			b.WriteString(fmt.Sprintf("(%v)) - (%T)", v, v))
+		}
 
-    if kind == reflect.Ptr || kind == reflect.Interface {
-      b.WriteString(fmt.Sprintf("(%v) - (%T)", v, v))
-      continue
-    }
+		if kind == reflect.Ptr || kind == reflect.Interface {
+			b.WriteString(fmt.Sprintf("(%v) - (%T)", v, v))
+			continue
+		}
 
-    if shared.IsNonPrimitive(kind) {
-      primitive = false
-    }
+		if shared.IsNonPrimitive(kind) {
+			primitive = false
+		}
 
-    s := hlpr.GetPrettyString(v, size) + " "
-    i := strings.LastIndex(s, "\n")
-    if i >= 0 {
-      size = len(s) - i
-    } else {
-      size = size + len(s)
-    }
+		s := hlpr.GetPrettyString(v, size) + " "
+		i := strings.LastIndex(s, "\n")
+		if i >= 0 {
+			size = len(s) - i
+		} else {
+			size = size + len(s)
+		}
 
-    if _, err := b.WriteString(s); err != nil {
-      writeToStderr("771c710b-aba2-46ef-9126-c26d3dfe7925", err)
-    }
+		if _, err := b.WriteString(s); err != nil {
+			writeToStderr("771c710b-aba2-46ef-9126-c26d3dfe7925", err)
+		}
 
-    if !primitive && (level == ll.TRACE || level == ll.DEBUG) {
+		if !primitive && (level == ll.TRACE || level == ll.DEBUG) {
 
-      if _, err := b.WriteString("\n"); err != nil {
-        writeToStderr("18614292-658f-42a5-81e7-593e941ea857", err)
-      }
+			if _, err := b.WriteString("\n"); err != nil {
+				writeToStderr("18614292-658f-42a5-81e7-593e941ea857", err)
+			}
 
-      if _, err := b.WriteString(fmt.Sprintf("info as sprintf: %+v", v)); err != nil {
-        writeToStderr("2a795ef2-65bb-4a03-9808-b072e4497d73", err)
-      }
+			if _, err := b.WriteString(fmt.Sprintf("info as sprintf: %+v", v)); err != nil {
+				writeToStderr("2a795ef2-65bb-4a03-9808-b072e4497d73", err)
+			}
 
-      b.Write([]byte("json:"))
-      if x, err := json.Marshal(v); err == nil {
-        if _, err := b.Write(x); err != nil {
-          writeToStderr("err:56831878-8d63-45f4-905b-d1b3bbac2152:", err)
-        }
-      } else {
-        writeToStderr("err:70bf10e0-6e69-4a3b-bf64-08f6d20c4580:", err)
-      }
+			b.Write([]byte("json:"))
+			if x, err := json.Marshal(v); err == nil {
+				if _, err := b.Write(x); err != nil {
+					writeToStderr("err:56831878-8d63-45f4-905b-d1b3bbac2152:", err)
+				}
+			} else {
+				writeToStderr("err:70bf10e0-6e69-4a3b-bf64-08f6d20c4580:", err)
+			}
 
-    }
+		}
 
-  }
+	}
 
-  if _, err := b.WriteString("\n"); err != nil {
-    writeToStderr("f834d14a-9735-4fd6-9389-f79144044746", err)
-  }
+	if _, err := b.WriteString("\n"); err != nil {
+		writeToStderr("f834d14a-9735-4fd6-9389-f79144044746", err)
+	}
 
-  return &b
+	return &b
 }
 
 func marshalCustomArray2(arr []interface{}) ([]byte, error) {
-  var b bytes.Buffer
-  b.WriteByte('[')
+	var b bytes.Buffer
+	b.WriteByte('[')
 
-  for i, v := range arr {
-    var buf []byte
-    var err error
+	for i, v := range arr {
+		var buf []byte
+		var err error
 
-    // Check if the value implements easyjson.Marshaler
-    if m, ok := v.(easyjson.Marshaler); ok {
-      buf, err = easyjson.Marshal(m)
-      fmt.Println(fmt.Sprintf(`["20095e96-d393-456a-9a9a-3e0c47ce760c","%s"]`, err.Error()));
-    } else {
-      // Fallback to encoding/json
-      buf, err = json.Marshal(v)
-    }
+		// Check if the value implements easyjson.Marshaler
+		if m, ok := v.(easyjson.Marshaler); ok {
+			buf, err = easyjson.Marshal(m)
+			fmt.Println(fmt.Sprintf(`["20095e96-d393-456a-9a9a-3e0c47ce760c","%s"]`, err.Error()))
+		} else {
+			// Fallback to encoding/json
+			buf, err = json.Marshal(v)
+		}
 
-    if err != nil {
-      return nil, err
-    }
+		if err != nil {
+			return nil, err
+		}
 
-    b.Write(buf)
+		b.Write(buf)
 
-    // Add comma between elements, but not after the last element
-    if i < len(arr)-1 {
-      b.WriteByte(',')
-    }
-  }
+		// Add comma between elements, but not after the last element
+		if i < len(arr)-1 {
+			b.WriteByte(',')
+		}
+	}
 
-  b.WriteByte(']')
+	b.WriteByte(']')
 
-  return b.Bytes(), nil
+	return b.Bytes(), nil
 }
 
 var bufferPool = sync.Pool{
-  New: func() interface{} {
-    return new(bytes.Buffer)
-  },
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
 }
 
 var bufferPool2 = sync.Pool{
-  New: func() interface{} {
-    return new(bytes.Buffer)
-  },
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
 }
 
 var bufferPool3 = sync.Pool{
-  New: func() interface{} {
-    return new(bytes.Buffer)
-  },
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
 }
 
 func marshalToJSON(v interface{}) ([]byte, error) {
-  buf := bufferPool.Get().(*bytes.Buffer)
-  buf.Reset()
-  defer bufferPool.Put(buf)
+	buf := bufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer bufferPool.Put(buf)
 
-  encoder := json.NewEncoder(buf)
-  if err := encoder.Encode(v); err != nil {
-    return nil, err
-  }
+	encoder := json.NewEncoder(buf)
+	if err := encoder.Encode(v); err != nil {
+		return nil, err
+	}
 
-  // Need to remove the trailing newline added by Encode
-  if buf.Len() > 0 {
-    buf.Truncate(buf.Len() - 1)
-  }
+	// Need to remove the trailing newline added by Encode
+	if buf.Len() > 0 {
+		buf.Truncate(buf.Len() - 1)
+	}
 
-  return buf.Bytes(), nil
+	return buf.Bytes(), nil
 }
 
 func marshalCustomArray(arr []interface{}) ([]byte, error) {
-  ///
-  b := bufferPool.Get().(*bytes.Buffer)
-  b.Reset() // Reset the buffer for reuse
-  defer bufferPool.Put(b)
+	///
+	b := bufferPool.Get().(*bytes.Buffer)
+	b.Reset() // Reset the buffer for reuse
+	defer bufferPool.Put(b)
 
-  b.WriteByte('[')
+	b.WriteByte('[')
 
-  for i, v := range arr {
-    var buf []byte
-    var err error
+	for i, v := range arr {
+		var buf []byte
+		var err error
 
-    // Check if the value implements easyjson.Marshaler
-    if m, ok := v.(easyjson.Marshaler); ok {
-      buf, err = easyjson.Marshal(m)
-    } else {
-      // Fallback to encoding/json
-      buf, err = json.Marshal(v)
-    }
+		// Check if the value implements easyjson.Marshaler
+		if m, ok := v.(easyjson.Marshaler); ok {
+			buf, err = easyjson.Marshal(m)
+		} else {
+			// Fallback to encoding/json
+			buf, err = json.Marshal(v)
+		}
 
-    if err != nil {
-      return nil, err
-    }
+		if err != nil {
+			return nil, err
+		}
 
-    b.Write(buf)
+		b.Write(buf)
 
-    // Add comma between elements, but not after the last element
-    if i < len(arr)-1 {
-      b.WriteByte(',')
-    }
-  }
+		// Add comma between elements, but not after the last element
+		if i < len(arr)-1 {
+			b.WriteByte(',')
+		}
+	}
 
-  b.WriteByte(']')
+	b.WriteByte(']')
 
-  return b.Bytes(), nil // Convert buffer to bytes and return
+	return b.Bytes(), nil // Convert buffer to bytes and return
 }
 
 var ioChan = make(chan func())
 var ioChan2 = make(chan func())
 
-func init(){
-  go func() {
-    for {
-      fn := <- ioChan
-      fn()
-    }
-  }()
+func init() {
+	go func() {
+		for {
+			fn := <-ioChan
+			fn()
+		}
+	}()
 
-  go func() {
-    for {
-      fn := <- ioChan2
-      fn()
-    }
-  }()
+	go func() {
+		for {
+			fn := <-ioChan2
+			fn()
+		}
+	}()
 
 }
 
 func (l *Logger) writeJSON(ts time.Time, level ll.LogLevel, mf *MetaFields, args *[]interface{}) {
 
-  l.Mtx.RLock()
-  appName := l.AppName
-  hostName := l.HostName
-  isShowLocalTZ := l.IsShowLocalTZ
-  timeZone := l.TimeZone
-  file := l.File
-  l.Mtx.RUnlock()
+	l.Mtx.RLock()
+	appName := l.AppName
+	hostName := l.HostName
+	isShowLocalTZ := l.IsShowLocalTZ
+	timeZone := l.TimeZone
+	file := l.File
+	l.Mtx.RUnlock()
 
-  if file == nil {
-    file = os.Stdout
-  }
+	if file == nil {
+		file = os.Stdout
+	}
 
-  date := ts.UTC().String()
+	date := ts.UTC().Format("2006-01-02 15:04:05.000000")
 
-  if isShowLocalTZ {
-    if timeZone != nil {
-      date = ts.UTC().In(timeZone).String()
-    } else {
-      date = ts.Local().String() // only first 25 chars
-    }
-  }
+	if isShowLocalTZ {
+		if timeZone != nil {
+			date = ts.UTC().In(timeZone).Format("2006-01-02 15:04:05.000000")
+		} else {
+			date = ts.Local().Format("2006-01-02 15:04:05.000000")
+		}
+	}
+	var strLevel = shared.LevelToString[level]
+	var pid = shared.PID
 
-  date = date[:26]
-  var strLevel = shared.LevelToString[level]
-  var pid = shared.PID
+	if mf == nil {
+		mf = NewMetaFields(&MF{})
+	}
 
-  if mf == nil {
-    mf = NewMetaFields(&MF{})
-  }
+	buf, err := json.Marshal([8]interface{}{"@bunion:v1", appName, strLevel, pid, hostName, date, mf.m, *args})
 
-  buf, err := json.Marshal([8]interface{}{"@bunion:v1", appName, strLevel, pid, hostName, date, mf.m, *args})
+	if err != nil {
 
-  if err != nil {
+		_, callerFile, line, _ := runtime.Caller(3)
+		DefaultLogger.Warn("json-logging: 1: could not marshal the slice:", err.Error(), "file://"+callerFile+":"+strconv.Itoa(line))
 
-    _, callerFile, line, _ := runtime.Caller(3)
-    DefaultLogger.Warn("json-logging: 1: could not marshal the slice:", err.Error(), "file://"+callerFile+":"+strconv.Itoa(line))
+		var cache = map[uintptr]interface{}{}
+		var cleaned = make([]interface{}, 0, len(*args))
 
-    var cache = map[uintptr]interface{}{}
-    var cleaned = make([]interface{}, 0, len(*args))
+		for i := 0; i < len(*args); i++ {
+			v := &(*args)[i]
+			c := hlpr.CleanUp(v, &cache)
+			cleaned = append(cleaned, c)
+		}
 
-    for i := 0; i < len(*args); i++ {
-      v := &(*args)[i]
-      c := hlpr.CleanUp(v, &cache)
-      cleaned = append(cleaned, c)
-    }
+		buf, err = json.Marshal([8]interface{}{"@bunion:v1", appName, strLevel, pid, hostName, date, mf.m, cleaned})
 
-    buf, err = json.Marshal([8]interface{}{"@bunion:v1", appName, strLevel, pid, hostName, date, mf.m, cleaned})
+		if err != nil {
+			writeToStderr(errors.New("Json-Logging: 2: could not marshal the slice: " + err.Error()))
+			return
+		}
+	}
 
-    if err != nil {
-      writeToStderr(errors.New("Json-Logging: 2: could not marshal the slice: " + err.Error()))
-      return
-    }
-  }
-
-  buf = append(buf, '\n')
-  l.writeOutput(file, buf)
+	buf = append(buf, '\n')
+	l.writeOutput(file, buf)
 }
 
 func (l *Logger) writeSwitch(time time.Time, level ll.LogLevel, m *MetaFields, args *[]interface{}) {
-  l.Mtx.RLock()
-  isLoggingJSON := l.IsLoggingJSON
-  l.Mtx.RUnlock()
+	l.Mtx.RLock()
+	isLoggingJSON := l.IsLoggingJSON
+	l.Mtx.RUnlock()
 
-  if isLoggingJSON {
-    l.writeJSON(time, level, m, args)
-  } else {
-    l.writeToFile(time, level, m, args)
-    // l.getPrettyString(time, level, m, args)
-  }
+	if isLoggingJSON {
+		l.writeJSON(time, level, m, args)
+	} else {
+		l.writeToFile(time, level, m, args)
+		// l.getPrettyString(time, level, m, args)
+	}
 }
 
 func (l *Logger) PrintEnvPlain() {
-  envVars := os.Environ() // Get all environment variables as a slice
-  sort.Strings(envVars)
-  for _, env := range envVars {
-    log.Println(env)
-  }
+	envVars := os.Environ() // Get all environment variables as a slice
+	sort.Strings(envVars)
+	for _, env := range envVars {
+		log.Println(env)
+	}
 }
 
 func (l *Logger) PrintEnv() {
-  envVars := os.Environ() // Get all environment variables as a slice
-  sort.Strings(envVars)
-  for _, env := range envVars {
-    l.Info(env)
-  }
+	envVars := os.Environ() // Get all environment variables as a slice
+	sort.Strings(envVars)
+	for _, env := range envVars {
+		l.Info(env)
+	}
 }
 
 func (l *Logger) JSON(args ...interface{}) {
-  size := len(args)
-  var b bytes.Buffer
-  for i := 0; i < size; i++ {
+	size := len(args)
+	var b bytes.Buffer
+	for i := 0; i < size; i++ {
 
-    v, err := json.Marshal(args[i])
+		v, err := json.Marshal(args[i])
 
-    if err != nil {
-      panic(err)
-    }
+		if err != nil {
+			panic(err)
+		}
 
-    b.Write(v)
-    if i < size-1 {
-      b.WriteByte(' ')
-    }
-  }
-  b.WriteByte('\n')
-  l.writeOutput(os.Stdout, b.Bytes())
+		b.Write(v)
+		if i < size-1 {
+			b.WriteByte(' ')
+		}
+	}
+	b.WriteByte('\n')
+	l.writeOutput(os.Stdout, b.Bytes())
 }
 
 func (l *Logger) RawJSON(args ...interface{}) {
-  // raw = no newlines, no spaces
-  var b bytes.Buffer
-  for i := 0; i < len(args); i++ {
+	// raw = no newlines, no spaces
+	var b bytes.Buffer
+	for i := 0; i < len(args); i++ {
 
-    v, err := json.Marshal(args[i])
+		v, err := json.Marshal(args[i])
 
-    if err != nil {
-      panic(err)
-    }
+		if err != nil {
+			panic(err)
+		}
 
-    b.Write(v)
-  }
-  l.writeOutput(os.Stdout, b.Bytes())
+		b.Write(v)
+	}
+	l.writeOutput(os.Stdout, b.Bytes())
 }
 
 type Stringer interface {
-  String() string
+	String() string
 }
 
 type LogItem struct {
-  AsString  string
-  ErrString string
-  Value     interface{}
+	AsString  string
+	ErrString string
+	Value     interface{}
 }
 
 type ArrayVal struct {
-  GoType      string
-  TrueLen     int
-  IsTruncated bool
-  Val         []interface{}
+	GoType      string
+	TrueLen     int
+	IsTruncated bool
+	Val         []interface{}
 }
 
 type MapVal struct {
-  GoType       string
-  TrueKeyCount int
-  IsTruncated  bool
-  Val          map[string]interface{}
+	GoType       string
+	TrueKeyCount int
+	IsTruncated  bool
+	Val          map[string]interface{}
 }
 
 type EmptyVal struct {
-  EmptyVal bool
+	EmptyVal bool
 }
 
 func doMap(v interface{}, val reflect.Value) *MapVal {
 
-  if x, ok := v.(MapVal); ok {
-    return &x
-  }
+	if x, ok := v.(MapVal); ok {
+		return &x
+	}
 
-  if x, ok := v.(*MapVal); ok {
-    return x
-  }
+	if x, ok := v.(*MapVal); ok {
+		return x
+	}
 
-  if !val.IsValid() {
-    return nil
-  }
+	if !val.IsValid() {
+		return nil
+	}
 
-  var z = MapVal{
-    GoType:       "<unknown>",
-    TrueKeyCount: 0,
-    IsTruncated:  false,
-    Val:          nil,
-  }
+	var z = MapVal{
+		GoType:       "<unknown>",
+		TrueKeyCount: 0,
+		IsTruncated:  false,
+		Val:          nil,
+	}
 
-  len := val.Len()
-  z.TrueKeyCount = len
-  z.GoType = val.Type().String()
+	len := val.Len()
+	z.TrueKeyCount = len
+	z.GoType = val.Type().String()
 
-  keyToRetrieve := "JLogMarker"
-  keyType := val.Type().Key()
-  markerKey := reflect.ValueOf(keyToRetrieve)
+	keyToRetrieve := "JLogMarker"
+	keyType := val.Type().Key()
+	markerKey := reflect.ValueOf(keyToRetrieve)
 
-  if markerKey.Type().AssignableTo(keyType) {
-    keyValue := val.MapIndex(markerKey)
-    if keyValue.IsValid() {
-      return &z
-    }
-  } else if markerKey.Type().ConvertibleTo(keyType) {
-    keyValue := val.MapIndex(markerKey.Convert(keyType))
-    if keyValue.IsValid() {
-      return &z
-    }
-  }
+	if markerKey.Type().AssignableTo(keyType) {
+		keyValue := val.MapIndex(markerKey)
+		if keyValue.IsValid() {
+			return &z
+		}
+	} else if markerKey.Type().ConvertibleTo(keyType) {
+		keyValue := val.MapIndex(markerKey.Convert(keyType))
+		if keyValue.IsValid() {
+			return &z
+		}
+	}
 
-  keys := val.MapKeys()
+	keys := val.MapKeys()
 
-  min := int(math.Min(float64(len), float64(25)))
-  if min < len {
-    z.IsTruncated = true
-  }
+	min := int(math.Min(float64(len), float64(25)))
+	if min < len {
+		z.IsTruncated = true
+	}
 
-  z.Val = map[string]interface{}{}
+	z.Val = map[string]interface{}{}
 
-  i := 0
-  for _, key := range keys {
-    if i++; i > min {
-      break
-    }
-    var el = val.MapIndex(key)
-    if el.IsValid() && el.CanInterface() {
-      z.Val[fmt.Sprintf("%v", key)] = getInspectableVal(el.Interface(), el, 0, 1)
-    } else {
-      z.Val[fmt.Sprintf("%v", key)] = nil
-    }
-  }
+	i := 0
+	for _, key := range keys {
+		if i++; i > min {
+			break
+		}
+		var el = val.MapIndex(key)
+		if el.IsValid() && el.CanInterface() {
+			z.Val[fmt.Sprintf("%v", key)] = getInspectableVal(el.Interface(), el, 0, 1)
+		} else {
+			z.Val[fmt.Sprintf("%v", key)] = nil
+		}
+	}
 
-  // for i := 0; i < min; i++ {
-  //  el := val.Index(i)
-  //  if el.IsValid() {
-  //    z.Val[i] = getInspectableVal(el.Interface(), el, 0, 1)
-  //  } else {
-  //    // Handle the case where the value is nil
-  //    z.Val[i] = nil // or any default value you want
-  //  }
-  // }
+	// for i := 0; i < min; i++ {
+	//  el := val.Index(i)
+	//  if el.IsValid() {
+	//    z.Val[i] = getInspectableVal(el.Interface(), el, 0, 1)
+	//  } else {
+	//    // Handle the case where the value is nil
+	//    z.Val[i] = nil // or any default value you want
+	//  }
+	// }
 
-  return &z
+	return &z
 }
 
 func doArray(v interface{}, rv reflect.Value) *ArrayVal {
 
-  if x, ok := v.(ArrayVal); ok {
-    return &x
-  }
+	if x, ok := v.(ArrayVal); ok {
+		return &x
+	}
 
-  if x, ok := v.(*ArrayVal); ok {
-    return x
-  }
+	if x, ok := v.(*ArrayVal); ok {
+		return x
+	}
 
-  var z = ArrayVal{
-    TrueLen:     0,
-    IsTruncated: false,
-    Val:         nil,
-    GoType:      "<unknown>",
-  }
+	var z = ArrayVal{
+		TrueLen:     0,
+		IsTruncated: false,
+		Val:         nil,
+		GoType:      "<unknown>",
+	}
 
-  len := rv.Len()
-  z.TrueLen = len
+	len := rv.Len()
+	z.TrueLen = len
 
-  min := int(math.Min(float64(len), float64(40)))
-  if min < len {
-    z.IsTruncated = true
-  }
+	min := int(math.Min(float64(len), float64(40)))
+	if min < len {
+		z.IsTruncated = true
+	}
 
-  z.Val = make([]interface{}, min)
+	z.Val = make([]interface{}, min)
 
-  for i := 0; i < min; i++ {
-    el := rv.Index(i)
-    if el.IsValid() {
-      z.GoType = fmt.Sprintf("%s", el.Type().String())
-      inf := el.Interface()
-      // z.GoType = fmt.Sprintf("%T", inf)
-      z.Val[i] = getInspectableVal(inf, el, 0, 1)
-    } else {
-      // Handle the case where the value is nil
-      z.Val[i] = nil // or any default value you want
-    }
-  }
+	for i := 0; i < min; i++ {
+		el := rv.Index(i)
+		if el.IsValid() {
+			z.GoType = fmt.Sprintf("%s", el.Type().String())
+			inf := el.Interface()
+			// z.GoType = fmt.Sprintf("%T", inf)
+			z.Val[i] = getInspectableVal(inf, el, 0, 1)
+		} else {
+			// Handle the case where the value is nil
+			z.Val[i] = nil // or any default value you want
+		}
+	}
 
-  // TODO: add the 3 last original elements to end of new list, if space permits
+	// TODO: add the 3 last original elements to end of new list, if space permits
 
-  // for i := 0; i < 3; i++ {
-  //  z.Val = append(z.Val, EmptyVal{EmptyVal: true})
-  // }
-  //
-  // var b = math.Max(3, float64(min-len))
-  //
-  // for i := int(b); i >= 0; i-- {
-  //  z.Val = append(z.Val, getInspectableVal(rv.Index(len-1-i).Interface(), 0))
-  // }
+	// for i := 0; i < 3; i++ {
+	//  z.Val = append(z.Val, EmptyVal{EmptyVal: true})
+	// }
+	//
+	// var b = math.Max(3, float64(min-len))
+	//
+	// for i := int(b); i >= 0; i-- {
+	//  z.Val = append(z.Val, getInspectableVal(rv.Index(len-1-i).Interface(), 0))
+	// }
 
-  return &z
+	return &z
 }
 
 type VibeInspectStr interface {
-  ToString() string
+	ToString() string
 }
 
 type VibeInspectInt interface {
-  ToInt() int
+	ToInt() int
 }
 
 type VibeInspectBool interface {
-  ToBool() bool
+	ToBool() bool
 }
 
 type UnkVal struct {
-  GoType   string
-  Val      interface{}
-  ValAsStr string
+	GoType   string
+	Val      interface{}
+	ValAsStr string
 }
 
 func getInspectableVal(obj interface{}, rv reflect.Value, depth int, count int) interface{} {
-  // /
-  // var rv = reflect.ValueOf(obj)
+	// /
+	// var rv = reflect.ValueOf(obj)
 
-  if depth > 16 {
-    return fmt.Sprintf("(go:max-depth:%T)", obj)
-  }
+	if depth > 16 {
+		return fmt.Sprintf("(go:max-depth:%T)", obj)
+	}
 
-  if count > 11 {
-    return obj
-  }
+	if count > 11 {
+		return obj
+	}
 
-  if !rv.IsValid() {
-    // Handle invalid reflection value (e.g., nil pointer)
-    return nil
-  }
+	if !rv.IsValid() {
+		// Handle invalid reflection value (e.g., nil pointer)
+		return nil
+	}
 
-  var v = rv.Interface()
+	var v = rv.Interface()
 
-  if v == nil {
-    return v
-  }
+	if v == nil {
+		return v
+	}
 
-  if rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Interface {
+	if rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Interface {
 
-    if rv.IsNil() {
-      // Handle nil interface value
-      return nil
-    }
+		if rv.IsNil() {
+			// Handle nil interface value
+			return nil
+		}
 
-    if !rv.IsValid() {
-      return nil
-    }
+		if !rv.IsValid() {
+			return nil
+		}
 
-    rv = rv.Elem()
+		rv = rv.Elem()
 
-    if !rv.IsValid() {
-      return nil
-    }
+		if !rv.IsValid() {
+			return nil
+		}
 
-    if rv.CanInterface() {
-      return getInspectableVal(rv.Interface(), rv, depth, count+1)
-    }
+		if rv.CanInterface() {
+			return getInspectableVal(rv.Interface(), rv, depth, count+1)
+		}
 
-  }
+	}
 
-  if !rv.CanInterface() {
-    return v
-  }
+	if !rv.CanInterface() {
+		return v
+	}
 
-  v = rv.Interface()
+	v = rv.Interface()
 
-  if v == nil {
-    return nil
-  }
+	if v == nil {
+		return nil
+	}
 
-  if x, ok := v.(string); ok {
-    return x
-  }
+	if x, ok := v.(string); ok {
+		return x
+	}
 
-  if x, ok := v.(int); ok {
-    return x
-  }
+	if x, ok := v.(int); ok {
+		return x
+	}
 
-  if x, ok := v.(bool); ok {
-    return x
-  }
+	if x, ok := v.(bool); ok {
+		return x
+	}
 
-  // if depth > 3 {
-  //  return v
-  // }
+	// if depth > 3 {
+	//  return v
+	// }
 
-  if !rv.IsValid() {
-    return nil
-  }
+	if !rv.IsValid() {
+		return nil
+	}
 
-  switch rv.Kind() {
-  //
-  case reflect.Slice:
-    if rv.Type().Elem().Kind() == reflect.Uint8 {
-      if z, ok := v.([]byte); ok {
-        return string(z)
-      }
-      return v
-    }
-    return doArray(v, rv)
+	switch rv.Kind() {
+	//
+	case reflect.Slice:
+		if rv.Type().Elem().Kind() == reflect.Uint8 {
+			if z, ok := v.([]byte); ok {
+				return string(z)
+			}
+			return v
+		}
+		return doArray(v, rv)
 
-  case reflect.Array:
-    if rv.Type().Elem().Kind() == reflect.Uint8 {
-      if z, ok := v.([]byte); ok {
-        return string(z)
-      }
-      return v
-    }
-    return doArray(v, rv)
-  }
+	case reflect.Array:
+		if rv.Type().Elem().Kind() == reflect.Uint8 {
+			if z, ok := v.([]byte); ok {
+				return string(z)
+			}
+			return v
+		}
+		return doArray(v, rv)
+	}
 
-  if rv.Kind() == reflect.Func {
-    return fmt.Sprintf("(func())")
-  }
+	if rv.Kind() == reflect.Func {
+		return fmt.Sprintf("(func())")
+	}
 
-  if rv.Kind() == reflect.Chan {
-    if rv.IsValid() && rv.CanInterface() {
-      return fmt.Sprintf("(chan (%v) %v)", rv.Type(), rv.Interface())
-    }
-    return fmt.Sprintf("(chan (%v) (%v) %+v)", rv.Type(), v, v)
-  }
+	if rv.Kind() == reflect.Chan {
+		if rv.IsValid() && rv.CanInterface() {
+			return fmt.Sprintf("(chan (%v) %v)", rv.Type(), rv.Interface())
+		}
+		return fmt.Sprintf("(chan (%v) (%v) %+v)", rv.Type(), v, v)
+	}
 
-  if rv.Kind() == reflect.Map {
-    return doMap(v, rv)
-  }
+	if rv.Kind() == reflect.Map {
+		return doMap(v, rv)
+	}
 
-  if rv.Kind() != reflect.Struct {
-    // if it's a not a struct now
-    var str = fmt.Sprintf("(%v / %v)", v, rv.Type().String())
-    var t = fmt.Sprintf("(%T / %v)", v, rv.Type().String())
-    return &UnkVal{
-      GoType:   t,
-      Val:      v,
-      ValAsStr: str,
-    }
-  }
+	if rv.Kind() != reflect.Struct {
+		// if it's a not a struct now
+		var str = fmt.Sprintf("(%v / %v)", v, rv.Type().String())
+		var t = fmt.Sprintf("(%T / %v)", v, rv.Type().String())
+		return &UnkVal{
+			GoType:   t,
+			Val:      v,
+			ValAsStr: str,
+		}
+	}
 
-  // it's a struct, so we can add metadata to it
-  var errStr = ""
-  var toString = ""
+	// it's a struct, so we can add metadata to it
+	var errStr = ""
+	var toString = ""
 
-  var typeStr = fmt.Sprintf("%T", v)
+	var typeStr = fmt.Sprintf("%T", v)
 
-  if rv.IsValid() {
-    typ := rv.Type()
-    z := typ.String()
-    if z != typeStr {
-      typeStr = fmt.Sprintf("(%s / %v / %s)", typeStr, typ, z)
-    }
-  }
+	if rv.IsValid() {
+		typ := rv.Type()
+		z := typ.String()
+		if z != typeStr {
+			typeStr = fmt.Sprintf("(%s / %v / %s)", typeStr, typ, z)
+		}
+	}
 
-  if z, ok := v.(error); ok {
-    errStr = z.Error()
-  }
+	if z, ok := v.(error); ok {
+		errStr = z.Error()
+	}
 
-  if z, ok := v.(Stringer); ok {
-    toString = z.String()
-  }
+	if z, ok := v.(Stringer); ok {
+		toString = z.String()
+	}
 
-  outResult := make(map[string]interface{})
+	outResult := make(map[string]interface{})
 
-  if typeStr != "" {
-    outResult["+(GoType):"] = typeStr
-  }
+	if typeStr != "" {
+		outResult["+(GoType):"] = typeStr
+	}
 
-  if errStr != "" {
-    outResult["+(ErrStr):"] = errStr
-  }
+	if errStr != "" {
+		outResult["+(ErrStr):"] = errStr
+	}
 
-  if toString != "" && toString != errStr {
-    outResult["+(ToStr):"] = toString
-  }
+	if toString != "" && toString != errStr {
+		outResult["+(ToStr):"] = toString
+	}
 
-  innerResult := make(map[string]interface{})
-  outResult["+(Val):"] = innerResult
+	innerResult := make(map[string]interface{})
+	outResult["+(Val):"] = innerResult
 
-  typ := rv.Type()
+	typ := rv.Type()
 
-  for i := 0; i < rv.NumField(); i++ {
+	for i := 0; i < rv.NumField(); i++ {
 
-    field := rv.Field(i)
-    fieldName := typ.Field(i).Name
+		field := rv.Field(i)
+		fieldName := typ.Field(i).Name
 
-    if !field.IsValid() {
-      innerResult[fieldName] = nil
-      continue
-    }
+		if !field.IsValid() {
+			innerResult[fieldName] = nil
+			continue
+		}
 
-    j := 0
+		j := 0
 
-    for {
+		for {
 
-      if j++; j > 9 {
-        // only try to deref so many times - perhaps it's a ptr to a ptr, etc
-        break
-      }
+			if j++; j > 9 {
+				// only try to deref so many times - perhaps it's a ptr to a ptr, etc
+				break
+			}
 
-      if !(field.Kind() == reflect.Ptr || field.Kind() == reflect.Interface) {
-        break
-      }
+			if !(field.Kind() == reflect.Ptr || field.Kind() == reflect.Interface) {
+				break
+			}
 
-      if !field.IsValid() {
-        innerResult[fieldName] = nil
-        break
-      }
+			if !field.IsValid() {
+				innerResult[fieldName] = nil
+				break
+			}
 
-      if field.IsNil() {
-        innerResult[fieldName] = nil
-        break
-      }
+			if field.IsNil() {
+				innerResult[fieldName] = nil
+				break
+			}
 
-      field = field.Elem()
+			field = field.Elem()
 
-      if !field.IsValid() {
-        innerResult[fieldName] = nil
-        break
-      }
+			if !field.IsValid() {
+				innerResult[fieldName] = nil
+				break
+			}
 
-    }
+		}
 
-    if _, ok := innerResult[fieldName]; ok {
-      continue
-    }
+		if _, ok := innerResult[fieldName]; ok {
+			continue
+		}
 
-    if field.Kind() == reflect.Interface || field.Kind() == reflect.Ptr {
+		if field.Kind() == reflect.Interface || field.Kind() == reflect.Ptr {
 
-      if field.IsNil() {
-        innerResult[fieldName] = nil
-        continue
-      }
+			if field.IsNil() {
+				innerResult[fieldName] = nil
+				continue
+			}
 
-      if !field.IsValid() {
-        innerResult[fieldName] = nil
-        continue
-      }
+			if !field.IsValid() {
+				innerResult[fieldName] = nil
+				continue
+			}
 
-      field = field.Elem()
+			field = field.Elem()
 
-      if !field.IsValid() {
-        innerResult[fieldName] = nil
-        continue
-      }
+			if !field.IsValid() {
+				innerResult[fieldName] = nil
+				continue
+			}
 
-      return fmt.Sprintf("yyy %T // %v", field.Interface(), field.Interface())
-    }
+			return fmt.Sprintf("yyy %T // %v", field.Interface(), field.Interface())
+		}
 
-    if field.CanInterface() {
-      innerResult[fieldName] = getInspectableVal(field.Interface(), field, depth+1, 1)
-      continue
-    }
+		if field.CanInterface() {
+			innerResult[fieldName] = getInspectableVal(field.Interface(), field, depth+1, 1)
+			continue
+		}
 
-    innerResult[fieldName] = fmt.Sprintf("%v (Type: %s)", field.String(), field.Type().String())
-    continue
+		innerResult[fieldName] = fmt.Sprintf("%v (Type: %s)", field.String(), field.Type().String())
+		continue
 
-    // f := rv.FieldByName(fieldName)
+		// f := rv.FieldByName(fieldName)
 
-    if field.CanAddr() {
-      field = reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
-      //field = reflect.NewAt(field.Type(), field.Addr().UnsafePointer())
-    }
+		if field.CanAddr() {
+			field = reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
+			//field = reflect.NewAt(field.Type(), field.Addr().UnsafePointer())
+		}
 
-    if field.IsValid() && field.CanInterface() {
-      innerResult[fieldName] = getInspectableVal(field.Interface(), field, depth+1, 1)
-    } else {
-      innerResult[fieldName] = fmt.Sprintf("%s", field.Type().String())
-    }
+		if field.IsValid() && field.CanInterface() {
+			innerResult[fieldName] = getInspectableVal(field.Interface(), field, depth+1, 1)
+		} else {
+			innerResult[fieldName] = fmt.Sprintf("%s", field.Type().String())
+		}
 
-    continue
-  }
+		continue
+	}
 
-  return outResult
+	return outResult
 }
 
 func (l *Logger) getMetaFields(args *[]interface{}) (*MetaFields, []interface{}) {
-  // //
-  var newArgs = []interface{}{}
-  var mf = NewMetaFields(&MF{})
+	// //
+	var newArgs = []interface{}{}
+	var mf = NewMetaFields(&MF{})
 
-  l.Mtx.RLock()
-  isLoggingJSON := l.IsLoggingJSON
-  highPerf := l.HighPerf
-  for k, v := range *l.MetaFields.m {
-    (*mf.m)[k] = v
-  }
-  l.Mtx.RUnlock()
+	l.Mtx.RLock()
+	isLoggingJSON := l.IsLoggingJSON
+	highPerf := l.HighPerf
+	for k, v := range *l.MetaFields.m {
+		(*mf.m)[k] = v
+	}
+	l.Mtx.RUnlock()
 
-  var hasLogId = false
+	var hasLogId = false
 
-  for _, x := range *args {
-    if z, ok := x.(MetaFields); ok {
-      for k, v := range *z.m {
-        (*mf.m)[k] = v
-      }
-    } else if z, ok := x.(*MetaFields); ok {
-      for k, v := range *z.m {
-        (*mf.m)[k] = v
-      }
-    } else if z, ok := x.(*LogId); ok {
-      (*mf.m)["log_id"] = z.GetLogId(true)
-      hasLogId = true
-      // newArgs = append(newArgs, z.GetLogId(true))
-    } else if z, ok := x.(LogId); ok {
-      (*mf.m)["log_id"] = z.GetLogId(true)
-      // newArgs = append(newArgs, z.GetLogId(true))
-      hasLogId = true
-    } else {
+	for _, x := range *args {
+		if z, ok := x.(MetaFields); ok {
+			for k, v := range *z.m {
+				(*mf.m)[k] = v
+			}
+		} else if z, ok := x.(*MetaFields); ok {
+			for k, v := range *z.m {
+				(*mf.m)[k] = v
+			}
+		} else if z, ok := x.(*LogId); ok {
+			(*mf.m)["log_id"] = z.GetLogId(true)
+			hasLogId = true
+			// newArgs = append(newArgs, z.GetLogId(true))
+		} else if z, ok := x.(LogId); ok {
+			(*mf.m)["log_id"] = z.GetLogId(true)
+			// newArgs = append(newArgs, z.GetLogId(true))
+			hasLogId = true
+		} else {
 
-      if isLoggingJSON {
-        newArgs = append(newArgs, x)
-      } else if !highPerf {
-        var xx = reflect.ValueOf(x)
-        newArgs = append(newArgs, getInspectableVal(x, xx, 0, 1))
-      } else {
-        newArgs = append(newArgs, x)
-      }
+			if isLoggingJSON {
+				newArgs = append(newArgs, x)
+			} else if !highPerf {
+				var xx = reflect.ValueOf(x)
+				newArgs = append(newArgs, getInspectableVal(x, xx, 0, 1))
+			} else {
+				newArgs = append(newArgs, x)
+			}
 
-    }
-  }
+		}
+	}
 
-  if false && !hasLogId {
-    fmt.Println("missing log id:", string(debug.Stack()))
-  }
+	if false && !hasLogId {
+		fmt.Println("missing log id:", string(debug.Stack()))
+	}
 
-  return mf, newArgs
+	return mf, newArgs
 }
 
 func (l *Logger) Trace(args ...interface{}) {
-  if !l.IsLevelEnabled(ll.TRACE) {
-    return
-  }
-  t := time.Now()
-  n := shared.GetNextLogNum()
-  var meta, newArgs = l.getMetaFields(&args)
-  (*meta.m)["log_num"] = n
-  l.writeSwitch(t, ll.TRACE, meta, &newArgs)
+	if !l.IsLevelEnabled(ll.TRACE) {
+		return
+	}
+	t := time.Now()
+	n := shared.GetNextLogNum()
+	var meta, newArgs = l.getMetaFields(&args)
+	(*meta.m)["log_num"] = n
+	l.writeSwitch(t, ll.TRACE, meta, &newArgs)
 }
 
 func (l *Logger) Debug(args ...interface{}) {
-  if !l.IsLevelEnabled(ll.DEBUG) {
-    return
-  }
-  t := time.Now()
-  n := shared.GetNextLogNum()
-  var meta, newArgs = l.getMetaFields(&args)
-  (*meta.m)["log_num"] = n
-  l.writeSwitch(t, ll.DEBUG, meta, &newArgs)
+	if !l.IsLevelEnabled(ll.DEBUG) {
+		return
+	}
+	t := time.Now()
+	n := shared.GetNextLogNum()
+	var meta, newArgs = l.getMetaFields(&args)
+	(*meta.m)["log_num"] = n
+	l.writeSwitch(t, ll.DEBUG, meta, &newArgs)
 }
 
 func (l *Logger) Info(args ...interface{}) {
-  if !l.IsLevelEnabled(ll.INFO) {
-    return
-  }
-  t := time.Now()
-  n := shared.GetNextLogNum()
-  var meta, newArgs = l.getMetaFields(&args)
-  (*meta.m)["log_num"] = n
-  l.writeSwitch(t, ll.INFO, meta, &newArgs)
+	if !l.IsLevelEnabled(ll.INFO) {
+		return
+	}
+	t := time.Now()
+	n := shared.GetNextLogNum()
+	var meta, newArgs = l.getMetaFields(&args)
+	(*meta.m)["log_num"] = n
+	l.writeSwitch(t, ll.INFO, meta, &newArgs)
 }
 
 func (l *Logger) Warn(args ...interface{}) {
-  if !l.IsLevelEnabled(ll.WARN) {
-    return
-  }
-  t := time.Now()
-  n := shared.GetNextLogNum()
-  var meta, newArgs = l.getMetaFields(&args)
-  (*meta.m)["log_num"] = n
-  l.writeSwitch(t, ll.WARN, meta, &newArgs)
+	if !l.IsLevelEnabled(ll.WARN) {
+		return
+	}
+	t := time.Now()
+	n := shared.GetNextLogNum()
+	var meta, newArgs = l.getMetaFields(&args)
+	(*meta.m)["log_num"] = n
+	l.writeSwitch(t, ll.WARN, meta, &newArgs)
 }
 
 func (l *Logger) Error(args ...interface{}) {
-  if !l.IsLevelEnabled(ll.ERROR) {
-    return
-  }
-  t := time.Now()
-  n := shared.GetNextLogNum()
-  var meta, newArgs = l.getMetaFields(&args)
-  (*meta.m)["log_num"] = n
-  filteredStackTrace := hlpr.GetFilteredStacktrace()
-  newArgs = append(newArgs, StackTrace{filteredStackTrace})
-  l.writeSwitch(t, ll.ERROR, meta, &newArgs)
+	if !l.IsLevelEnabled(ll.ERROR) {
+		return
+	}
+	t := time.Now()
+	n := shared.GetNextLogNum()
+	var meta, newArgs = l.getMetaFields(&args)
+	(*meta.m)["log_num"] = n
+	filteredStackTrace := hlpr.GetFilteredStacktrace()
+	newArgs = append(newArgs, StackTrace{filteredStackTrace})
+	l.writeSwitch(t, ll.ERROR, meta, &newArgs)
 }
 
 func (l *Logger) Critical(args ...interface{}) {
-  if !l.IsLevelEnabled(ll.CRITICAL) {
-    return
-  }
-  t := time.Now()
-  n := shared.GetNextLogNum()
-  var meta, newArgs = l.getMetaFields(&args)
-  (*meta.m)["log_num"] = n
-  filteredStackTrace := hlpr.GetFilteredStacktrace()
-  newArgs = append(newArgs, StackTrace{filteredStackTrace})
-  l.writeSwitch(t, ll.CRITICAL, meta, &newArgs)
+	if !l.IsLevelEnabled(ll.CRITICAL) {
+		return
+	}
+	t := time.Now()
+	n := shared.GetNextLogNum()
+	var meta, newArgs = l.getMetaFields(&args)
+	(*meta.m)["log_num"] = n
+	filteredStackTrace := hlpr.GetFilteredStacktrace()
+	newArgs = append(newArgs, StackTrace{filteredStackTrace})
+	l.writeSwitch(t, ll.CRITICAL, meta, &newArgs)
 }
 
 type errorIdMarker struct{}
@@ -1531,25 +1529,25 @@ type errorIdMarker struct{}
 var eidMarker = &errorIdMarker{}
 
 type ErrorId struct {
-  Id            string
-  errorIdMarker *errorIdMarker
+	Id            string
+	errorIdMarker *errorIdMarker
 }
 
 type Opts struct {
-  IsPrintStackTrace bool
-  errorIdMarker     *errorIdMarker
+	IsPrintStackTrace bool
+	errorIdMarker     *errorIdMarker
 }
 
 func ErrId(id string) *ErrorId {
-  return &ErrorId{
-    id, eidMarker,
-  }
+	return &ErrorId{
+		id, eidMarker,
+	}
 }
 
 func ErrOpts(id string) *ErrorId {
-  return &ErrorId{
-    id, eidMarker,
-  }
+	return &ErrorId{
+		id, eidMarker,
+	}
 }
 
 type MF = map[string]interface{}
@@ -1560,183 +1558,183 @@ type metaFieldsMarker struct{}
 var mfMarker = &metaFieldsMarker{}
 
 type MetaFields struct {
-  *metaFieldsMarker
-  UniqueMarker string
-  m            *MF
+	*metaFieldsMarker
+	UniqueMarker string
+	m            *MF
 }
 
 func MetaPairs(
-  k1 string, v1 interface{},
-  args ...interface{}) *MetaFields {
-  return MP(k1, v1, args...)
+	k1 string, v1 interface{},
+	args ...interface{}) *MetaFields {
+	return MP(k1, v1, args...)
 }
 
 func MP(
-  k1 string, v1 interface{},
-  args ...interface{}) *MetaFields {
+	k1 string, v1 interface{},
+	args ...interface{}) *MetaFields {
 
-  m := make(map[string]interface{})
-  nargs := append([]interface{}{k1, v1}, args...) // prepend the first two arguments to new slice
+	m := make(map[string]interface{})
+	nargs := append([]interface{}{k1, v1}, args...) // prepend the first two arguments to new slice
 
-  currKey := ""
+	currKey := ""
 
-  for i, a := range nargs {
+	for i, a := range nargs {
 
-    if i%2 == 0 {
-      // operate on keys
-      v, ok := a.(string)
-      if ok {
-        currKey = v
-      } else {
-        panic("even arguments must be strings, odd arguments are interface{}")
-      }
-      if len(nargs) < i+2 {
-        panic("a key needs a respective value.")
-      }
-      continue
-    }
+		if i%2 == 0 {
+			// operate on keys
+			v, ok := a.(string)
+			if ok {
+				currKey = v
+			} else {
+				panic("even arguments must be strings, odd arguments are interface{}")
+			}
+			if len(nargs) < i+2 {
+				panic("a key needs a respective value.")
+			}
+			continue
+		}
 
-    // operate on values
-    m[currKey] = a
-  }
+		// operate on values
+		m[currKey] = a
+	}
 
-  return NewMetaFields(&m)
+	return NewMetaFields(&m)
 
 }
 
 func (l *Logger) TagPair(k string, v interface{}) *Logger {
-  var z = map[string]interface{}{k: v}
-  return l.Child(&z)
+	var z = map[string]interface{}{k: v}
+	return l.Child(&z)
 }
 
 func (l *Logger) Tags(z *map[string]interface{}) *Logger {
-  return l.Create(z)
+	return l.Create(z)
 }
 
 func (l *Logger) TraceF(s string, args ...interface{}) {
-  if !l.IsLevelEnabled(ll.TRACE) {
-    return
-  }
-  t := time.Now()
-  n := shared.GetNextLogNum()
-  var empty []interface{}
-  var meta, _ = l.getMetaFields(&empty)
-  (*meta.m)["log_num"] = n
-  l.writeSwitch(t, ll.TRACE, meta, &[]interface{}{fmt.Sprintf(s, args...)})
+	if !l.IsLevelEnabled(ll.TRACE) {
+		return
+	}
+	t := time.Now()
+	n := shared.GetNextLogNum()
+	var empty []interface{}
+	var meta, _ = l.getMetaFields(&empty)
+	(*meta.m)["log_num"] = n
+	l.writeSwitch(t, ll.TRACE, meta, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) DebugF(s string, args ...interface{}) {
-  if !l.IsLevelEnabled(ll.DEBUG) {
-    return
-  }
-  t := time.Now()
-  n := shared.GetNextLogNum()
-  var empty []interface{}
-  var meta, _ = l.getMetaFields(&empty)
-  (*meta.m)["log_num"] = n
-  l.writeSwitch(t, ll.DEBUG, meta, &[]interface{}{fmt.Sprintf(s, args...)})
+	if !l.IsLevelEnabled(ll.DEBUG) {
+		return
+	}
+	t := time.Now()
+	n := shared.GetNextLogNum()
+	var empty []interface{}
+	var meta, _ = l.getMetaFields(&empty)
+	(*meta.m)["log_num"] = n
+	l.writeSwitch(t, ll.DEBUG, meta, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) InfoF(s string, args ...interface{}) {
-  if !l.IsLevelEnabled(ll.INFO) {
-    return
-  }
-  t := time.Now()
-  n := shared.GetNextLogNum()
-  var empty []interface{}
-  var meta, _ = l.getMetaFields(&empty)
-  (*meta.m)["log_num"] = n
-  l.writeSwitch(t, ll.INFO, meta, &[]interface{}{fmt.Sprintf(s, args...)})
+	if !l.IsLevelEnabled(ll.INFO) {
+		return
+	}
+	t := time.Now()
+	n := shared.GetNextLogNum()
+	var empty []interface{}
+	var meta, _ = l.getMetaFields(&empty)
+	(*meta.m)["log_num"] = n
+	l.writeSwitch(t, ll.INFO, meta, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 func (l *Logger) WarnF(s string, args ...interface{}) {
-  if !l.IsLevelEnabled(ll.WARN) {
-    return
-  }
-  t := time.Now()
-  n := shared.GetNextLogNum()
-  var empty []interface{}
-  var meta, _ = l.getMetaFields(&empty)
-  (*meta.m)["log_num"] = n
-  l.writeSwitch(t, ll.WARN, meta, &[]interface{}{fmt.Sprintf(s, args...)})
+	if !l.IsLevelEnabled(ll.WARN) {
+		return
+	}
+	t := time.Now()
+	n := shared.GetNextLogNum()
+	var empty []interface{}
+	var meta, _ = l.getMetaFields(&empty)
+	(*meta.m)["log_num"] = n
+	l.writeSwitch(t, ll.WARN, meta, &[]interface{}{fmt.Sprintf(s, args...)})
 }
 
 type StackTrace struct {
-  ErrorTrace *[]string
+	ErrorTrace *[]string
 }
 
 func (l *Logger) ErrorF(s string, args ...interface{}) {
-  if !l.IsLevelEnabled(ll.ERROR) {
-    return
-  }
-  t := time.Now()
-  n := shared.GetNextLogNum()
-  filteredStackTrace := hlpr.GetFilteredStacktrace()
-  formattedString := fmt.Sprintf(s, args...)
-  var empty []interface{}
-  var meta, _ = l.getMetaFields(&empty)
-  (*meta.m)["log_num"] = n
-  l.writeSwitch(t, ll.ERROR, meta, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
+	if !l.IsLevelEnabled(ll.ERROR) {
+		return
+	}
+	t := time.Now()
+	n := shared.GetNextLogNum()
+	filteredStackTrace := hlpr.GetFilteredStacktrace()
+	formattedString := fmt.Sprintf(s, args...)
+	var empty []interface{}
+	var meta, _ = l.getMetaFields(&empty)
+	(*meta.m)["log_num"] = n
+	l.writeSwitch(t, ll.ERROR, meta, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
 func (l *Logger) CriticalF(s string, args ...interface{}) {
-  if !l.IsLevelEnabled(ll.CRITICAL) {
-    return
-  }
-  t := time.Now()
-  n := shared.GetNextLogNum()
-  filteredStackTrace := hlpr.GetFilteredStacktrace()
-  formattedString := fmt.Sprintf(s, args...)
-  var empty []interface{}
-  var meta, _ = l.getMetaFields(&empty)
-  (*meta.m)["log_num"] = n
-  l.writeSwitch(t, ll.CRITICAL, meta, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
+	if !l.IsLevelEnabled(ll.CRITICAL) {
+		return
+	}
+	t := time.Now()
+	n := shared.GetNextLogNum()
+	filteredStackTrace := hlpr.GetFilteredStacktrace()
+	formattedString := fmt.Sprintf(s, args...)
+	var empty []interface{}
+	var meta, _ = l.getMetaFields(&empty)
+	(*meta.m)["log_num"] = n
+	l.writeSwitch(t, ll.CRITICAL, meta, &[]interface{}{formattedString, StackTrace{filteredStackTrace}})
 }
 
 func (l *Logger) NewLine() {
-  l.writeOutput(os.Stdout, []byte("\n"))
+	l.writeOutput(os.Stdout, []byte("\n"))
 }
 
 func (l *Logger) Spaces(num int32) {
-  if num < 1 {
-    return
-  }
-  l.writeOutput(os.Stdout, []byte(strings.Repeat(" ", int(num))))
+	if num < 1 {
+		return
+	}
+	l.writeOutput(os.Stdout, []byte(strings.Repeat(" ", int(num))))
 }
 
 func (l *Logger) Tabs(num int32) {
-  if num < 1 {
-    return
-  }
-  l.writeOutput(os.Stdout, []byte(strings.Repeat("\t", int(num))))
+	if num < 1 {
+		return
+	}
+	l.writeOutput(os.Stdout, []byte(strings.Repeat("\t", int(num))))
 }
 
 func (l *Logger) PlainStdout(args ...interface{}) {
-  var b bytes.Buffer
-  for _, a := range args {
-    v := fmt.Sprintf("((%T) %#v) ", a, a)
-    b.WriteString(v)
-  }
-  b.WriteByte('\n')
-  l.writeOutput(os.Stdout, b.Bytes())
+	var b bytes.Buffer
+	for _, a := range args {
+		v := fmt.Sprintf("((%T) %#v) ", a, a)
+		b.WriteString(v)
+	}
+	b.WriteByte('\n')
+	l.writeOutput(os.Stdout, b.Bytes())
 }
 
 func (l *Logger) PlainStderr(args ...interface{}) {
-  var b bytes.Buffer
-  for _, a := range args {
-    v := fmt.Sprintf("((%T) %#v) ", a, a)
-    b.WriteString(v)
-  }
-  b.WriteByte('\n')
-  l.writeOutput(os.Stderr, b.Bytes())
+	var b bytes.Buffer
+	for _, a := range args {
+		v := fmt.Sprintf("((%T) %#v) ", a, a)
+		b.WriteString(v)
+	}
+	b.WriteByte('\n')
+	l.writeOutput(os.Stderr, b.Bytes())
 }
 
 var DefaultLogger = CreateLogger("Default").
-  SetToJSONOutput().
-  SetLogLevel(ll.TRACE)
+	SetToJSONOutput().
+	SetLogLevel(ll.TRACE)
 
 func init() {
 
-  // log.SetFlags(log.LstdFlags | log.Llongfile)
+	// log.SetFlags(log.LstdFlags | log.Llongfile)
 
 }
