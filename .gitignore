@@ -1,2 +1,6 @@
 .idea
 *.log
+tmp
+temp
+tmp/worktrees
+temp/worktrees
